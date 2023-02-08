@@ -141,13 +141,15 @@ func TestGenKatAEAD(t *testing.T) {
 				t.Errorf("decrypted ciphertext does not match the plaintext (Count = %d): got %X, want %X", num, d, msg)
 			}
 
-			c[i%len(c)] ^= 1
+			c[num%len(c)] ^= 1
 			if _, err := a.Open(nil, nonce, c, ad); err == nil {
 				t.Errorf("decryption succeeded unexpectedly (Count = %d)", num)
 			}
 		}
 	}
 }
+
+// TODO: test overlap
 
 func benchHash(b *testing.B, f func() hash.Hash, size int64) {
 	var tmp [Size]byte
