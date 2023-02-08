@@ -55,13 +55,25 @@ func (d *digest) initHash(r, a, b uint8, h uint32) {
 func (d *digest) Write(b []byte) (int, error) {
 	written := len(b)
 	bs := d.BlockSize()
-	for len(b) > 0 {
+	// try to empty the buffer, if it isn't empty already
+	if d.len > 0 && d.len+len(b) >= bs {
 		n := copy(d.buf[d.len:bs], b)
 		d.len += n
 		b = b[n:]
 		if d.len == bs {
-			d.absorb()
+			d.absorb() // TODO: pB
 		}
+	}
+	// absorb bytes directly, skipping the buffer
+	for len(b) >= bs {
+		d.s[0] ^= be64dec(b)
+		roundGeneric(&d.s, roundc[:]) // TODO: pB
+		b = b[bs:]
+	}
+	// store any remaining bytes in the buffer
+	if len(b) > 0 {
+		n := copy(d.buf[d.len:bs], b)
+		d.len += n
 	}
 	return written, nil
 }
