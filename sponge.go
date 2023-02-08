@@ -119,11 +119,3 @@ func be64dec(b []byte) uint64 {
 func be64enc(b []byte, x uint64) []byte {
 	return append(b, byte(x>>56), byte(x>>48), byte(x>>40), byte(x>>32), byte(x>>24), byte(x>>16), byte(x>>8), byte(x))
 }
-
-func le64dec(b []byte) uint64 {
-	return uint64(b[0])<<0 | uint64(b[1])<<8 | uint64(b[2])<<16 | uint64(b[3])<<24 | uint64(b[4])<<32 | uint64(b[5])<<40 | uint64(b[6])<<48 | uint64(b[7])<<56
-}
-
-func le64enc(b []byte, x uint64) []byte {
-	return append(b, byte(x), byte(x>>8), byte(x>>16), byte(x>>24), byte(x>>32), byte(x>>40), byte(x>>48), byte(x>>56))
-}
