@@ -168,7 +168,7 @@ func benchSeal(b *testing.B, size int64) {
 	a := new(AEAD)
 	nonce := make([]byte, NonceSize)
 	for i := 0; i < b.N; i++ {
-		a.Seal(dst[:0], nonce, msg[:size], nil)
+		a.Seal(dst[:0], nonce, msg, nil)
 	}
 }
 
@@ -176,3 +176,24 @@ func BenchmarkSeal_8(b *testing.B)  { benchSeal(b, 8) }
 func BenchmarkSeal_64(b *testing.B) { benchSeal(b, 64) }
 func BenchmarkSeal_1k(b *testing.B) { benchSeal(b, 1024) }
 func BenchmarkSeal_8k(b *testing.B) { benchSeal(b, 8192) }
+
+func benchOpen(b *testing.B, size int64) {
+	b.StopTimer()
+	b.SetBytes(size)
+	var msg = make([]byte, size)
+	a := new(AEAD)
+	nonce := make([]byte, NonceSize)
+	ciphertext := a.Seal(nil, nonce, msg, nil)
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := a.Open(msg[:0], nonce, ciphertext, nil)
+		if err != nil {
+			b.Fatal("decryption failed")
+		}
+	}
+}
+
+func BenchmarkOpen_8(b *testing.B)  { benchOpen(b, 8) }
+func BenchmarkOpen_64(b *testing.B) { benchOpen(b, 64) }
+func BenchmarkOpen_1k(b *testing.B) { benchOpen(b, 1024) }
+func BenchmarkOpen_8k(b *testing.B) { benchOpen(b, 8192) }
