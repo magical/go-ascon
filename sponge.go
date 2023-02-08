@@ -3,7 +3,10 @@
 
 package ascon
 
-import "hash"
+import (
+	"encoding/binary"
+	"hash"
+)
 
 const Size = 256 / 8      // bytes
 const BlockSize = 64 / 8  // bytes
@@ -117,8 +120,9 @@ func (d0 *digest) Sum(b []byte) []byte {
 }
 
 func be64dec(b []byte) uint64 {
-	return uint64(b[0])<<56 | uint64(b[1])<<48 | uint64(b[2])<<40 | uint64(b[3])<<32 | uint64(b[4])<<24 | uint64(b[5])<<16 | uint64(b[6])<<8 | uint64(b[7])<<0
+	return binary.BigEndian.Uint64(b)
 }
+
 func be64enc(b []byte, x uint64) []byte {
 	return append(b, byte(x>>56), byte(x>>48), byte(x>>40), byte(x>>32), byte(x>>24), byte(x>>16), byte(x>>8), byte(x))
 }
