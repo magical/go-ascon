@@ -160,3 +160,19 @@ func BenchmarkHash256_8(b *testing.B)  { benchHash(b, NewHash, 8) }
 func BenchmarkHash256_64(b *testing.B) { benchHash(b, NewHash, 64) }
 func BenchmarkHash256_1k(b *testing.B) { benchHash(b, NewHash, 1024) }
 func BenchmarkHash256_8k(b *testing.B) { benchHash(b, NewHash, 8192) }
+
+func benchSeal(b *testing.B, size int64) {
+	var dst = make([]byte, size+TagSize)
+	var msg = make([]byte, size)
+	b.SetBytes(size)
+	a := new(AEAD)
+	nonce := make([]byte, NonceSize)
+	for i := 0; i < b.N; i++ {
+		a.Seal(dst[:0], nonce, msg[:size], nil)
+	}
+}
+
+func BenchmarkSeal_8(b *testing.B)  { benchSeal(b, 8) }
+func BenchmarkSeal_64(b *testing.B) { benchSeal(b, 64) }
+func BenchmarkSeal_1k(b *testing.B) { benchSeal(b, 1024) }
+func BenchmarkSeal_8k(b *testing.B) { benchSeal(b, 8192) }
