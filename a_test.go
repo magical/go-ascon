@@ -6,6 +6,7 @@ package ascon
 import (
 	"bufio"
 	"bytes"
+	"crypto/cipher"
 	"encoding/hex"
 	"fmt"
 	"hash"
@@ -68,6 +69,8 @@ func unhex(s string) []byte {
 	}
 	return b
 }
+
+var _ cipher.AEAD = (*AEAD)(nil)
 
 func TestAEAD(t *testing.T) {
 	//Count = 514
