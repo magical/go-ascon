@@ -5,6 +5,7 @@ package ascon
 
 import (
 	"bufio"
+	"encoding/hex"
 	"fmt"
 	"hash"
 	"os"
@@ -57,6 +58,43 @@ func TestGenKat(t *testing.T) {
 		fmt.Fprintln(w)
 	}
 	w.Flush()
+}
+
+func unhex(s string) []byte {
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
+func TestAEAD(t *testing.T) {
+	//Count = 514
+	//Key = 000102030405060708090A0B0C0D0E0F
+	//Nonce = 000102030405060708090A0B0C0D0E0F
+	//PT = 000102030405060708090A0B0C0D0E
+	//AD = 000102030405060708090A0B0C0D0E0F1011
+	//CT = 77AA511159627C4B855E67F95B3ABFA1FA8B51439743E4C8B41E4E76B40460
+	//
+	//Count = 496
+	//AD =
+	//CT = BC820DBDF7A4631C5B29884AD6917516D420A5BC2E5357D010818F0B5F7859
+	var (
+		key   = unhex("000102030405060708090A0B0C0D0E0F")
+		nonce = key
+		text  = unhex("000102030405060708090A0B0C0D0E")
+		ad    = unhex("000102030405060708090A0B0C0D0E0F1011")
+		want  = "77AA511159627C4B855E67F95B3ABFA1FA8B51439743E4C8B41E4E76B40460"
+		//ad   = unhex("")
+		//want = "BC820DBDF7A4631C5B29884AD6917516D420A5BC2E5357D010818F0B5F7859"
+	)
+	a := new(AEAD)
+	copy(a.key[:], key)
+	c := a.Seal(nil, nonce, text, ad)
+	got := fmt.Sprintf("%X", c)
+	if got != want {
+		t.Errorf("got %s, want %s", got, want)
+	}
 }
 
 func benchmark(b *testing.B, f func() hash.Hash, size int64) {
