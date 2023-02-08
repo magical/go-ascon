@@ -53,3 +53,21 @@ func TestGenKat(t *testing.T) {
 	}
 	w.Flush()
 }
+
+func benchmark(b *testing.B, f func() hash.Hash, size int64) {
+	var tmp [Size]byte
+	var msg [8192]byte
+	b.SetBytes(size)
+	h := f()
+	for i := 0; i < b.N; i++ {
+		h.Reset()
+		h.Write(msg[:size])
+		h.Sum(tmp[:0])
+	}
+}
+
+// Benchmark the Keccak-f permutation function
+func Benchmark256_8(b *testing.B)   { benchmark(b, NewHash, 8) }
+func Benchmark256_256(b *testing.B) { benchmark(b, NewHash, 256) }
+func Benchmark256_1k(b *testing.B)  { benchmark(b, NewHash, 1024) }
+func Benchmark256_8k(b *testing.B)  { benchmark(b, NewHash, 8192) }
