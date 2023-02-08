@@ -3,17 +3,25 @@
 
 package ascon
 
+import "hash"
+
 const Size = 256 / 8      // bytes
 const BlockSize = 64 / 8  // bytes
 const stateSize = 320 / 8 // bytes
 
 // digest implements hash.Hash
 type digest struct {
-	a    [5]uint64
+	s    [5]uint64
 	buf  [8]byte
 	len  int   // number of bytes in buf
 	size int   // size of the output
 	b    uint8 // number of rounds for the pB round function
+}
+
+func NewHash() hash.Hash {
+	d := &digest{}
+	d.Reset()
+	return d
 }
 
 // The size of the final hash, in bytes.
@@ -25,7 +33,8 @@ func (d *digest) BlockSize() int { return BlockSize }
 
 func (d *digest) Reset() {
 	//fmt.Println("resetting")
-	d.a = [5]uint64{}
+	d.s = [5]uint64{}
+	d.initHash(BlockSize*8, 12, 12, Size*8)
 	d.buf = [8]byte{}
 	d.len = 0
 }
@@ -33,14 +42,14 @@ func (d *digest) Reset() {
 // Ascon-Hash: l=256, hash=256, datablock=64, a=12, b=12
 
 func (d *digest) initHash(r, a, b uint8, h uint32) {
-	d.a[0] = uint64(r)<<48 + uint64(a)<<40 + uint64(a-b)<<32 + uint64(h)
-	d.a[1] = 0
-	d.a[2] = 0
-	d.a[3] = 0
-	d.a[4] = 0
+	d.s[0] = uint64(r)<<48 + uint64(a)<<40 + uint64(a-b)<<32 + uint64(h)
+	d.s[1] = 0
+	d.s[2] = 0
+	d.s[3] = 0
+	d.s[4] = 0
 	d.b = b
-	d.size = Size
-	roundGeneric(&d.a, roundc[:]) // TODO: pA
+	d.size = int(h / 8)
+	roundGeneric(&d.s, roundc[:]) // TODO: pA
 }
 
 func (d *digest) Write(b []byte) (int, error) {
@@ -59,8 +68,8 @@ func (d *digest) Write(b []byte) (int, error) {
 
 func (d *digest) absorb() {
 	//fmt.Printf("Flushing with %d bytes\n", d.len)
-	d.a[0] ^= be64dec(d.buf[0:])
-	roundGeneric(&d.a, roundc[:]) // TODO: pB
+	d.s[0] ^= be64dec(d.buf[0:])
+	roundGeneric(&d.s, roundc[:]) // TODO: pB
 	d.len = 0
 }
 
@@ -85,9 +94,9 @@ func (d0 *digest) Sum(b []byte) []byte {
 	// Squeeze
 	for i := 0; i < d.size/8; i++ {
 		if i != 0 {
-			roundGeneric(&d.a, roundc[:]) // TODO: pB
+			roundGeneric(&d.s, roundc[:]) // TODO: pB
 		}
-		b = be64enc(b, d.a[0])
+		b = be64enc(b, d.s[0])
 	}
 	return b
 }
