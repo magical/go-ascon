@@ -55,8 +55,11 @@ func (d *digest) initHash(r, a, b uint8, h uint32) {
 	d.s[4] = 0
 	d.b = b
 	d.size = int(h / 8)
-	roundGeneric(&d.s, roundc[:]) // TODO: pA
+	d.roundA()
 }
+
+func (d *digest) roundA() { roundGeneric(&d.s, roundc[:]) }
+func (d *digest) roundB() { roundGeneric(&d.s, roundc[12-d.b:]) }
 
 func (d *digest) Write(b []byte) (int, error) {
 	written := len(b)
@@ -67,13 +70,15 @@ func (d *digest) Write(b []byte) (int, error) {
 		d.len += n
 		b = b[n:]
 		if d.len == bs {
-			d.absorb() // TODO: pB
+			d.s[0] ^= be64dec(d.buf[0:])
+			d.roundB()
+			d.len = 0
 		}
 	}
 	// absorb bytes directly, skipping the buffer
 	for len(b) >= bs {
 		d.s[0] ^= be64dec(b)
-		roundGeneric(&d.s, roundc[:]) // TODO: pB
+		d.roundB()
 		b = b[bs:]
 	}
 	// store any remaining bytes in the buffer
@@ -82,13 +87,6 @@ func (d *digest) Write(b []byte) (int, error) {
 		d.len += n
 	}
 	return written, nil
-}
-
-func (d *digest) absorb() {
-	//fmt.Printf("Flushing with %d bytes\n", d.len)
-	d.s[0] ^= be64dec(d.buf[0:])
-	roundGeneric(&d.s, roundc[:]) // TODO: pB
-	d.len = 0
 }
 
 func (d0 *digest) Sum(b []byte) []byte {
@@ -104,15 +102,16 @@ func (d0 *digest) Sum(b []byte) []byte {
 		d.buf[i] = 0
 	}
 	d.buf[d.len] |= 0x80
-	d.len = bs
 
 	// absorb the last block
-	d.absorb() // TODO: pA
+	d.s[0] ^= be64dec(d.buf[0:])
+	d.roundA()
+	d.len = 0
 
 	// Squeeze
 	for i := 0; i < d.size/8; i++ {
 		if i != 0 {
-			roundGeneric(&d.s, roundc[:]) // TODO: pB
+			d.roundB()
 		}
 		b = be64enc(b, d.s[0])
 	}
