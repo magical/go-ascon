@@ -64,7 +64,7 @@ func (d *digest) roundB() { roundGeneric(&d.s, roundc[12-d.b:]) }
 
 func (d *digest) Write(b []byte) (int, error) {
 	written := len(b)
-	bs := d.BlockSize()
+	const bs = BlockSize
 	// try to empty the buffer, if it isn't empty already
 	if d.len > 0 && d.len+len(b) >= bs {
 		n := copy(d.buf[d.len:bs], b)
@@ -98,7 +98,7 @@ func (d0 *digest) Sum(b []byte) []byte {
 	}
 
 	// Pad with a 1 followed by zeroes
-	bs := d.BlockSize()
+	const bs = BlockSize
 	for i := d.len; i < bs; i++ {
 		d.buf[i] = 0
 	}
