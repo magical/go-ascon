@@ -140,6 +140,11 @@ func TestGenKatAEAD(t *testing.T) {
 			} else if !bytes.Equal(d, msg) {
 				t.Errorf("decrypted ciphertext does not match the plaintext (Count = %d): got %X, want %X", num, d, msg)
 			}
+
+			c[i%len(c)] ^= 1
+			if _, err := a.Open(nil, nonce, c, ad); err == nil {
+				t.Errorf("decryption succeeded unexpectedly (Count = %d)", num)
+			}
 		}
 	}
 }
