@@ -47,6 +47,7 @@ func TestGenKat(t *testing.T) {
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
+	defer w.Flush()
 	for i := 0; i <= 1024; i++ {
 		b := make([]byte, i)
 		for j := range b {
@@ -57,7 +58,6 @@ func TestGenKat(t *testing.T) {
 		fmt.Fprintf(w, "MD = %X\n", hashBytes(b))
 		fmt.Fprintln(w)
 	}
-	w.Flush()
 }
 
 func unhex(s string) []byte {
@@ -94,6 +94,46 @@ func TestAEAD(t *testing.T) {
 	got := fmt.Sprintf("%X", c)
 	if got != want {
 		t.Errorf("got %s, want %s", got, want)
+	}
+}
+
+func TestGenKatAEAD(t *testing.T) {
+	f, err := os.Create("ascon_aead_kat.txt")
+	if err != nil {
+		t.Skip("couldn't create output file")
+	}
+	defer f.Close()
+	w := bufio.NewWriter(f)
+	defer w.Flush()
+	num := 1
+
+	mk := func(n int) []byte {
+		b := make([]byte, n)
+		for i := range b {
+			b[i] = byte(i % 256)
+		}
+		return b
+	}
+	for i := 0; i <= 32; i++ {
+		for j := 0; j <= 32; j++ {
+
+			key := mk(16)
+			nonce := mk(16)
+			msg := mk(i)
+			ad := mk(j)
+
+			fmt.Fprintf(w, "Count = %d\n", num)
+			fmt.Fprintf(w, "Key = %X\n", key)
+			fmt.Fprintf(w, "Nonce = %X\n", nonce)
+			fmt.Fprintf(w, "PT = %X\n", msg)
+			fmt.Fprintf(w, "AD = %X\n", ad)
+			a := new(AEAD)
+			copy(a.key[:], key)
+			c := a.Seal(nil, nonce, msg, ad)
+			fmt.Fprintf(w, "CT = %X\n", c)
+			fmt.Fprintln(w)
+			num += 1
+		}
 	}
 }
 

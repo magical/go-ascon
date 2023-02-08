@@ -3,7 +3,6 @@ package ascon
 import (
 	"encoding/binary"
 	"fmt"
-	"log"
 )
 
 const (
@@ -32,7 +31,7 @@ func (aead *AEAD) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 	// IV || key || nonce
 	d := new(digest)
 	d.initAEAD(key, 64, 12, 6, nonce)
-	log.Printf("%x\n", &d.s)
+	//log.Printf("%x\n", &d.s)
 
 	// mix the key in again
 	d.s[3] ^= be64dec(key[0:])
