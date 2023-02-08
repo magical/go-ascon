@@ -7,15 +7,20 @@ import (
 	"bufio"
 	"fmt"
 	"hash"
-	"log"
 	"os"
 	"testing"
 )
 
 func TestInit(t *testing.T) {
-	d := new(digest)
-	d.initHash(64, 12, 12, 256)
-	log.Printf("%x", &d.s)
+	d := NewHash().(*digest)
+	//d.initHash(64, 12, 12, 256)
+	got := d.s
+	want := [5]uint64{0xee9398aadb67f03d, 0x8bb21831c60f1002, 0xb48a92db98d5da62, 0x43189921b8f8e3e8, 0x348fa5c9d525e140}
+	for i := range got {
+		if got[i] != want[i] {
+			t.Errorf("s[%d] = %016x, want %016x", i, got[i], want[i])
+		}
+	}
 }
 
 func TestHash(t *testing.T) {

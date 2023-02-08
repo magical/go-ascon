@@ -33,10 +33,16 @@ func (d *digest) BlockSize() int { return BlockSize }
 
 func (d *digest) Reset() {
 	//fmt.Println("resetting")
-	d.s = [5]uint64{}
-	d.initHash(BlockSize*8, 12, 12, Size*8)
+	//d.initHash(BlockSize*8, 12, 12, Size*8)
+	d.s[0] = 0xee9398aadb67f03d
+	d.s[1] = 0x8bb21831c60f1002
+	d.s[2] = 0xb48a92db98d5da62
+	d.s[3] = 0x43189921b8f8e3e8
+	d.s[4] = 0x348fa5c9d525e140
 	d.buf = [8]byte{}
 	d.len = 0
+	d.size = Size
+	d.b = 12
 }
 
 // Ascon-Hash: l=256, hash=256, datablock=64, a=12, b=12
