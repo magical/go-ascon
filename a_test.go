@@ -72,7 +72,7 @@ func benchmark(b *testing.B, f func() hash.Hash, size int64) {
 }
 
 // Benchmark the Keccak-f permutation function
-func Benchmark256_8(b *testing.B)   { benchmark(b, NewHash, 8) }
-func Benchmark256_256(b *testing.B) { benchmark(b, NewHash, 256) }
-func Benchmark256_1k(b *testing.B)  { benchmark(b, NewHash, 1024) }
-func Benchmark256_8k(b *testing.B)  { benchmark(b, NewHash, 8192) }
+func Benchmark256_8(b *testing.B)  { benchmark(b, NewHash, 8) }
+func Benchmark256_64(b *testing.B) { benchmark(b, NewHash, 64) }
+func Benchmark256_1k(b *testing.B) { benchmark(b, NewHash, 1024) }
+func Benchmark256_8k(b *testing.B) { benchmark(b, NewHash, 8192) }
