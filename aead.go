@@ -14,8 +14,26 @@ const (
 	//BlockSize
 )
 
+// AEAD provides an implementation of Ascon-128.
+// It implements the crypto/cipher.AEAD interface.
 type AEAD struct {
+	// TODO: k0, k1 uint64?
 	key [16]byte
+}
+
+func NewAEAD(key []byte) (*AEAD, error) {
+	a := new(AEAD)
+	a.SetKey(key)
+	return a, nil
+}
+
+// Sets the key to a new value.
+// This method is not safe for concurrent use with other methods.
+func (a *AEAD) SetKey(key []byte) {
+	if len(key) != 16 {
+		panic("ascon: wrong key size")
+	}
+	copy(a.key[:], key)
 }
 
 func (_ *AEAD) NonceSize() int { return NonceSize }
