@@ -40,28 +40,7 @@ func (aead *AEAD) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 	d.s[4] ^= be64dec(key[8:])
 
 	// Absorb additionalData
-	ad := additionalData
-	if len(ad) > 0 {
-		for len(ad) >= 8 {
-			d.s[0] ^= be64dec(ad)
-			ad = ad[8:]
-			d.roundB()
-		}
-		if len(ad) > 0 {
-			d.buf = [8]byte{}
-			n := copy(d.buf[:], ad)
-			// Pad
-			d.buf[n] |= 0x80
-			d.s[0] ^= be64dec(d.buf[:])
-			d.roundB()
-		} else {
-			// Pad
-			d.s[0] ^= 0x80 << 56
-			d.roundB()
-		}
-	} else {
-		// If there is no additional data, no padding is applied
-	}
+	d.mixAdditionalData(additionalData)
 	// domain-separation constant
 	d.s[4] ^= 1
 
@@ -126,6 +105,31 @@ func (d *digest) initAEAD(key []byte, r, a, b uint8, nonce []byte) {
 	d.roundA()
 }
 
+func (d *digest) mixAdditionalData(additionalData []byte) {
+	ad := additionalData
+	if len(ad) > 0 {
+		for len(ad) >= 8 {
+			d.s[0] ^= be64dec(ad)
+			ad = ad[8:]
+			d.roundB()
+		}
+		if len(ad) > 0 {
+			d.buf = [8]byte{}
+			n := copy(d.buf[:], ad)
+			// Pad
+			d.buf[n] |= 0x80
+			d.s[0] ^= be64dec(d.buf[:])
+			d.roundB()
+		} else {
+			// Pad
+			d.s[0] ^= 0x80 << 56
+			d.roundB()
+		}
+	} else {
+		// If there is no additional data, no padding is applied
+	}
+}
+
 var fail = errors.New("ascon: decryption failed")
 
 func (aead *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, error) {
@@ -157,28 +161,7 @@ func (aead *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, e
 	d.s[4] ^= be64dec(key[8:])
 
 	// Absorb additionalData
-	ad := additionalData
-	if len(ad) > 0 {
-		for len(ad) >= 8 {
-			d.s[0] ^= be64dec(ad)
-			ad = ad[8:]
-			d.roundB()
-		}
-		if len(ad) > 0 {
-			d.buf = [8]byte{}
-			n := copy(d.buf[:], ad)
-			// Pad
-			d.buf[n] |= 0x80
-			d.s[0] ^= be64dec(d.buf[:])
-			d.roundB()
-		} else {
-			// Pad
-			d.s[0] ^= 0x80 << 56
-			d.roundB()
-		}
-	} else {
-		// If there is no additional data, no padding is applied
-	}
+	d.mixAdditionalData(additionalData)
 	// domain-separation constant
 	d.s[4] ^= 1
 
