@@ -5,6 +5,7 @@ package ascon
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"hash"
@@ -133,6 +134,12 @@ func TestGenKatAEAD(t *testing.T) {
 			fmt.Fprintf(w, "CT = %X\n", c)
 			fmt.Fprintln(w)
 			num += 1
+
+			if d, err := a.Open(nil, nonce, c, ad); err != nil {
+				t.Errorf("decryption failed (Count = %d): %v", num, err)
+			} else if !bytes.Equal(d, msg) {
+				t.Errorf("decrypted ciphertext does not match the plaintext (Count = %d): got %X, want %X", num, d, msg)
+			}
 		}
 	}
 }

@@ -1,7 +1,9 @@
 package ascon
 
 import (
+	"crypto/subtle"
 	"encoding/binary"
+	"errors"
 	"fmt"
 )
 
@@ -122,5 +124,112 @@ func (d *digest) initAEAD(key []byte, r, a, b uint8, nonce []byte) {
 	//log.Printf("%x\n", &d.s)
 	d.b = b
 	d.roundA()
+}
 
+var fail = errors.New("ascon: decryption failed")
+
+func (aead *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, error) {
+	key := aead.key[:]
+	if len(nonce) != NonceSize {
+		panic(fmt.Sprintf("ascon: bad nonce (len %d)", len(nonce)))
+		// return fail?
+	}
+
+	if len(ciphertext) < TagSize {
+		return dst, fail
+	}
+	plaintextSize := len(ciphertext) - TagSize
+	expectedTag := ciphertext[plaintextSize:]
+	c := ciphertext[0:plaintextSize]
+
+	dstLen := len(dst)
+	dst = append(dst, make([]byte, plaintextSize)...)
+	p := dst[dstLen:]
+
+	// Initialize
+	// IV || key || nonce
+	d := new(digest)
+	d.initAEAD(key, 64, 12, 6, nonce)
+	//log.Printf("%x\n", &d.s)
+
+	// mix the key in again
+	d.s[3] ^= be64dec(key[0:])
+	d.s[4] ^= be64dec(key[8:])
+
+	// Absorb additionalData
+	ad := additionalData
+	if len(ad) > 0 {
+		for len(ad) >= 8 {
+			d.s[0] ^= be64dec(ad)
+			ad = ad[8:]
+			d.roundB()
+		}
+		if len(ad) > 0 {
+			d.buf = [8]byte{}
+			n := copy(d.buf[:], ad)
+			// Pad
+			d.buf[n] |= 0x80
+			d.s[0] ^= be64dec(d.buf[:])
+			d.roundB()
+		} else {
+			// Pad
+			d.s[0] ^= 0x80 << 56
+			d.roundB()
+		}
+	} else {
+		// If there is no additional data, no padding is applied
+	}
+	// domain-separation constant
+	d.s[4] ^= 1
+
+	// Duplex plaintext/ciphertext
+	for len(c) >= 8 {
+		x := be64dec(c)
+		binary.BigEndian.PutUint64(p, x^d.s[0])
+		d.s[0] = x
+		p = p[8:]
+		c = c[8:]
+		d.roundB()
+	}
+	if len(c) > 0 {
+		for i := range p {
+			p[i] = c[i] ^ byte(d.s[0]>>(56-i*8))
+		}
+
+		var x uint64
+		for i := range p {
+			x |= uint64(p[i]) << (56 - i*8)
+		}
+		x |= 0x80 << (56 - (len(c) * 8)) // Pad
+
+		d.s[0] ^= x
+	} else {
+		// Pad
+		d.s[0] ^= 0x80 << 56
+	}
+	// note: no round is done after the final plaintext block
+
+	// mix the key in again
+	d.s[1] ^= be64dec(key[0:])
+	d.s[2] ^= be64dec(key[8:])
+
+	// Finalize
+	d.roundA()
+
+	// Compute tag
+	t0 := d.s[3] ^ be64dec(key[0:])
+	t1 := d.s[4] ^ be64dec(key[8:])
+	// Check tag in constant time
+	t0 ^= be64dec(expectedTag[0:])
+	t1 ^= be64dec(expectedTag[8:])
+	t := uint32(t0>>32) | uint32(t0)
+	t |= uint32(t1>>32) | uint32(t1)
+	if subtle.ConstantTimeEq(int32(t), 0) == 0 {
+		//t0 = d.s[3] ^ be64dec(key[0:])
+		//t1 = d.s[4] ^ be64dec(key[8:])
+		//return dst, fmt.Errorf("tag mismatch: got %016x %016x, want %x", t0, t1, expectedTag)
+		return dst, fail
+	}
+
+	return dst, nil
 }
