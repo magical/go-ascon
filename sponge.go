@@ -19,13 +19,13 @@ type digest struct {
 }
 
 func NewHash() hash.Hash {
-	d := &digest{}
+	d := new(digest)
 	d.Reset()
 	return d
 }
 
 // The size of the final hash, in bytes.
-func (d *digest) Size() int { return d.size }
+func (d *digest) Size() int { return Size }
 
 // The data rate of the sponge, in bytes.
 // Writes which are a multiple of BlockSize will be more performant.
@@ -41,7 +41,6 @@ func (d *digest) Reset() {
 	d.s[4] = 0x348fa5c9d525e140
 	d.buf = [8]byte{}
 	d.len = 0
-	d.size = Size
 	d.b = 12
 }
 
@@ -54,7 +53,6 @@ func (d *digest) initHash(r, a, b uint8, h uint32) {
 	d.s[3] = 0
 	d.s[4] = 0
 	d.b = b
-	d.size = int(h / 8)
 	d.roundA()
 }
 
@@ -109,7 +107,7 @@ func (d0 *digest) Sum(b []byte) []byte {
 	d.len = 0
 
 	// Squeeze
-	for i := 0; i < d.size/8; i++ {
+	for i := 0; i < Size/8; i++ {
 		if i != 0 {
 			d.roundB()
 		}
