@@ -7,7 +7,9 @@ import "math/bits"
 
 // https://ascon.iaik.tugraz.at/files/asconv12-nist.pdf
 
-func roundGeneric(s *[5]uint64, rounds []uint8) {
+type state [5]uint64
+
+func roundGeneric(s *state, rounds []uint8) {
 	var x0, x1, x2, x3, x4 uint64
 	x0 = s[0]
 	x1 = s[1]

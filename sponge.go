@@ -14,7 +14,7 @@ const stateSize = 320 / 8 // bytes
 
 // digest implements hash.Hash
 type digest struct {
-	s    [5]uint64
+	s    state
 	buf  [8]byte
 	len  int   // number of bytes in buf
 	size int   // size of the output
@@ -49,8 +49,8 @@ func (d *digest) Reset() {
 
 // Ascon-Hash: l=256, hash=256, datablock=64, a=12, b=12
 
-func (d *digest) initHash(r, a, b uint8, h uint32) {
-	d.s[0] = uint64(r)<<48 + uint64(a)<<40 + uint64(a-b)<<32 + uint64(h)
+func (d *digest) initHash(blockSize, a, b uint8, h uint32) {
+	d.s[0] = uint64(blockSize)<<48 + uint64(a)<<40 + uint64(a-b)<<32 + uint64(h)
 	d.s[1] = 0
 	d.s[2] = 0
 	d.s[3] = 0

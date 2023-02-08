@@ -49,18 +49,19 @@ func (aead *AEAD) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 
 	// Initialize
 	// IV || key || nonce
-	d := new(digest)
-	d.initAEAD(key, 64, 12, 6, nonce)
-	//log.Printf("%x\n", &d.s)
+	var s state
+	A, B := 12, 6
+	s.initAEAD(key, 64, uint8(A), uint8(B), nonce)
+	//log.Printf("%x\n", &s)
 
 	// mix the key in again
-	d.s[3] ^= be64dec(key[0:])
-	d.s[4] ^= be64dec(key[8:])
+	s[3] ^= be64dec(key[0:])
+	s[4] ^= be64dec(key[8:])
 
 	// Absorb additionalData
-	d.mixAdditionalData(additionalData)
+	s.mixAdditionalData(additionalData, B)
 	// domain-separation constant
-	d.s[4] ^= 1
+	s[4] ^= 1
 
 	// allocate space
 	dstLen := len(dst)
@@ -70,78 +71,77 @@ func (aead *AEAD) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 	p := plaintext
 	c := dst[dstLen:]
 	for len(p) >= 8 {
-		d.s[0] ^= be64dec(p)
-		binary.BigEndian.PutUint64(c, d.s[0])
+		s[0] ^= be64dec(p)
+		binary.BigEndian.PutUint64(c, s[0])
 		p = p[8:]
 		c = c[8:]
-		d.roundB()
+		s.rounds(B)
 	}
 	if len(p) > 0 {
-		d.buf = [8]byte{}
-		n := copy(d.buf[:], p)
+		var buf [8]byte
+		n := copy(buf[:], p)
 		// Pad
-		d.buf[n] |= 0x80
-		d.s[0] ^= be64dec(d.buf[:])
+		buf[n] |= 0x80
+		s[0] ^= be64dec(buf[:])
 		// may write up to 7 too many bytes
 		// but it's okay because we have space reserved
 		// for the tag
-		binary.BigEndian.PutUint64(c, d.s[0])
+		binary.BigEndian.PutUint64(c, s[0])
 		c = c[n:]
 	} else {
 		// Pad
-		d.s[0] ^= 0x80 << 56
+		s[0] ^= 0x80 << 56
 	}
 	// note: no round is done after the final plaintext block
 
 	// mix the key in again
-	d.s[1] ^= be64dec(key[0:])
-	d.s[2] ^= be64dec(key[8:])
+	s[1] ^= be64dec(key[0:])
+	s[2] ^= be64dec(key[8:])
 
 	// Finalize
-	d.roundA()
+	s.rounds(A)
 
 	// Append tag
-	t0 := d.s[3] ^ be64dec(key[0:])
-	t1 := d.s[4] ^ be64dec(key[8:])
+	t0 := s[3] ^ be64dec(key[0:])
+	t1 := s[4] ^ be64dec(key[8:])
 	binary.BigEndian.PutUint64(c[0:], t0)
 	binary.BigEndian.PutUint64(c[8:], t1)
 
 	return dst
 }
 
-func (d *digest) initAEAD(key []byte, r, a, b uint8, nonce []byte) {
+func (s *state) initAEAD(key []byte, blockSize, A, B uint8, nonce []byte) {
 	if len(key) != KeySize {
 		panic("invalid key length")
 	}
-	d.s[0] = uint64(byte(len(key)*8))<<56 + uint64(r)<<48 + uint64(a)<<40 + uint64(a-b)<<32
-	d.s[1] = be64dec(key[0:])
-	d.s[2] = be64dec(key[8:])
-	d.s[3] = be64dec(nonce[0:])
-	d.s[4] = be64dec(nonce[8:])
-	//log.Printf("%x\n", &d.s)
-	d.b = b
-	d.roundA()
+	s[0] = uint64(byte(len(key)*8))<<56 + uint64(blockSize)<<48 + uint64(A)<<40 + uint64(A-B)<<32
+	s[1] = be64dec(key[0:])
+	s[2] = be64dec(key[8:])
+	s[3] = be64dec(nonce[0:])
+	s[4] = be64dec(nonce[8:])
+	//log.Printf("%x\n", &s)
+	s.rounds(int(A))
 }
 
-func (d *digest) mixAdditionalData(additionalData []byte) {
+func (s *state) mixAdditionalData(additionalData []byte, B int) {
 	ad := additionalData
 	if len(ad) > 0 {
 		for len(ad) >= 8 {
-			d.s[0] ^= be64dec(ad)
+			s[0] ^= be64dec(ad)
 			ad = ad[8:]
-			d.roundB()
+			s.rounds(B)
 		}
 		if len(ad) > 0 {
-			d.buf = [8]byte{}
-			n := copy(d.buf[:], ad)
+			var buf [8]byte
+			n := copy(buf[:], ad)
 			// Pad
-			d.buf[n] |= 0x80
-			d.s[0] ^= be64dec(d.buf[:])
-			d.roundB()
+			buf[n] |= 0x80
+			s[0] ^= be64dec(buf[:])
+			s.rounds(B)
 		} else {
 			// Pad
-			d.s[0] ^= 0x80 << 56
-			d.roundB()
+			s[0] ^= 0x80 << 56
+			s.rounds(B)
 		}
 	} else {
 		// If there is no additional data, no padding is applied
@@ -170,31 +170,32 @@ func (aead *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, e
 
 	// Initialize
 	// IV || key || nonce
-	d := new(digest)
-	d.initAEAD(key, 64, 12, 6, nonce)
-	//log.Printf("%x\n", &d.s)
+	var s state
+	A, B := 12, 6
+	s.initAEAD(key, 64, uint8(A), uint8(B), nonce)
+	//log.Printf("%x\n", &s)
 
 	// mix the key in again
-	d.s[3] ^= be64dec(key[0:])
-	d.s[4] ^= be64dec(key[8:])
+	s[3] ^= be64dec(key[0:])
+	s[4] ^= be64dec(key[8:])
 
 	// Absorb additionalData
-	d.mixAdditionalData(additionalData)
+	s.mixAdditionalData(additionalData, B)
 	// domain-separation constant
-	d.s[4] ^= 1
+	s[4] ^= 1
 
 	// Duplex plaintext/ciphertext
 	for len(c) >= 8 {
 		x := be64dec(c)
-		binary.BigEndian.PutUint64(p, x^d.s[0])
-		d.s[0] = x
+		binary.BigEndian.PutUint64(p, x^s[0])
+		s[0] = x
 		p = p[8:]
 		c = c[8:]
-		d.roundB()
+		s.rounds(B)
 	}
 	if len(c) > 0 {
 		for i := range p {
-			p[i] = c[i] ^ byte(d.s[0]>>(56-i*8))
+			p[i] = c[i] ^ byte(s[0]>>(56-i*8))
 		}
 
 		var x uint64
@@ -203,34 +204,36 @@ func (aead *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, e
 		}
 		x |= 0x80 << (56 - (len(c) * 8)) // Pad
 
-		d.s[0] ^= x
+		s[0] ^= x
 	} else {
 		// Pad
-		d.s[0] ^= 0x80 << 56
+		s[0] ^= 0x80 << 56
 	}
 	// note: no round is done after the final plaintext block
 
 	// mix the key in again
-	d.s[1] ^= be64dec(key[0:])
-	d.s[2] ^= be64dec(key[8:])
+	s[1] ^= be64dec(key[0:])
+	s[2] ^= be64dec(key[8:])
 
 	// Finalize
-	d.roundA()
+	s.rounds(A)
 
 	// Compute tag
-	t0 := d.s[3] ^ be64dec(key[0:])
-	t1 := d.s[4] ^ be64dec(key[8:])
+	t0 := s[3] ^ be64dec(key[0:])
+	t1 := s[4] ^ be64dec(key[8:])
 	// Check tag in constant time
 	t0 ^= be64dec(expectedTag[0:])
 	t1 ^= be64dec(expectedTag[8:])
 	t := uint32(t0>>32) | uint32(t0)
 	t |= uint32(t1>>32) | uint32(t1)
 	if subtle.ConstantTimeEq(int32(t), 0) == 0 {
-		//t0 = d.s[3] ^ be64dec(key[0:])
-		//t1 = d.s[4] ^ be64dec(key[8:])
+		//t0 = s[3] ^ be64dec(key[0:])
+		//t1 = s[4] ^ be64dec(key[8:])
 		//return dst, fmt.Errorf("tag mismatch: got %016x %016x, want %x", t0, t1, expectedTag)
 		return dst, fail
 	}
 
 	return dst, nil
 }
+
+func (s *state) rounds(r int) { roundGeneric(s, roundc[12-r:]) }
