@@ -55,7 +55,7 @@ func FuzzAEAD(f *testing.F) {
 				}
 			}
 		}
-		if noise != 0 {
+		if noise != 0 && noiseIndex >= 0 {
 			doNoise("nonce", nonce)
 			doNoise("ciphertext", ciphertext)
 			doNoise("additional data", ad)
