@@ -27,6 +27,12 @@ func FuzzAEAD(f *testing.F) {
 		noise byte, noiseIndex int,
 	) {
 		a := newAEAD(key)
+		if msgLen < 0 || msgLen > 0x4000 {
+			return
+		}
+		if adLen < 0 || adLen > 0x100 {
+			return
+		}
 		msg := bytes.Repeat([]byte{msgByte}, msgLen)
 		ad := bytes.Repeat([]byte{adByte}, adLen)
 		ciphertext := a.Seal(nil, nonce, msg, ad)
