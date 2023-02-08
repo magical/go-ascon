@@ -39,8 +39,7 @@ func FuzzAEAD(f *testing.F) {
 		decrypted, err := a.Open(nil, nonce, ciphertext, ad)
 		if err != nil {
 			t.Error(err)
-		}
-		if !bytes.Equal(decrypted, msg) {
+		} else if !bytes.Equal(decrypted, msg) {
 			t.Error("plaintext mismatch")
 		}
 
