@@ -2,7 +2,6 @@ package ascon
 
 import (
 	"crypto/subtle"
-	"encoding/binary"
 	"errors"
 	"fmt"
 )
@@ -72,7 +71,7 @@ func (aead *AEAD) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 	c := dst[dstLen:]
 	for len(p) >= 8 {
 		s[0] ^= be64dec(p)
-		binary.BigEndian.PutUint64(c, s[0])
+		be64enc(c, s[0])
 		p = p[8:]
 		c = c[8:]
 		s.rounds(B)
@@ -86,7 +85,7 @@ func (aead *AEAD) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 		// may write up to 7 too many bytes
 		// but it's okay because we have space reserved
 		// for the tag
-		binary.BigEndian.PutUint64(c, s[0])
+		be64enc(c, s[0])
 		c = c[n:]
 	} else {
 		// Pad
@@ -104,8 +103,8 @@ func (aead *AEAD) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 	// Append tag
 	t0 := s[3] ^ be64dec(key[0:])
 	t1 := s[4] ^ be64dec(key[8:])
-	binary.BigEndian.PutUint64(c[0:], t0)
-	binary.BigEndian.PutUint64(c[8:], t1)
+	be64enc(c[0:], t0)
+	be64enc(c[8:], t1)
 
 	return dst
 }
@@ -187,7 +186,7 @@ func (aead *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, e
 	// Duplex plaintext/ciphertext
 	for len(c) >= 8 {
 		x := be64dec(c)
-		binary.BigEndian.PutUint64(p, x^s[0])
+		be64enc(p, x^s[0])
 		s[0] = x
 		p = p[8:]
 		c = c[8:]

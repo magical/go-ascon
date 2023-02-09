@@ -3,10 +3,7 @@
 
 package ascon
 
-import (
-	"encoding/binary"
-	"hash"
-)
+import "hash"
 
 const Size = 256 / 8      // bytes
 const BlockSize = 64 / 8  // bytes
@@ -114,15 +111,7 @@ func (d0 *digest) Sum(b []byte) []byte {
 		if i != 0 {
 			d.roundB()
 		}
-		b = be64enc(b, d.s[0])
+		b = be64append(b, d.s[0])
 	}
 	return b
-}
-
-func be64dec(b []byte) uint64 {
-	return binary.BigEndian.Uint64(b)
-}
-
-func be64enc(b []byte, x uint64) []byte {
-	return append(b, byte(x>>56), byte(x>>48), byte(x>>40), byte(x>>32), byte(x>>24), byte(x>>16), byte(x>>8), byte(x))
 }
