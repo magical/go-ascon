@@ -124,26 +124,30 @@ func (s *state) initAEAD(key []byte, blockSize, A, B uint8, nonce []byte) {
 
 func (s *state) mixAdditionalData(additionalData []byte, B int) {
 	ad := additionalData
+	if len(ad) <= 0 {
+		// If there is no additional data, nothing is added
+		// and no padding is applied
+		return
+	}
+
+	for len(ad) >= 8 {
+		s[0] ^= be64dec(ad)
+		ad = ad[8:]
+		s.rounds(B)
+	}
+
+	// last chunk
 	if len(ad) > 0 {
-		for len(ad) >= 8 {
-			s[0] ^= be64dec(ad)
-			ad = ad[8:]
-			s.rounds(B)
-		}
-		if len(ad) > 0 {
-			var buf [8]byte
-			n := copy(buf[:], ad)
-			// Pad
-			buf[n] |= 0x80
-			s[0] ^= be64dec(buf[:])
-			s.rounds(B)
-		} else {
-			// Pad
-			s[0] ^= 0x80 << 56
-			s.rounds(B)
-		}
+		var buf [8]byte
+		n := copy(buf[:], ad)
+		// Pad
+		buf[n] |= 0x80
+		s[0] ^= be64dec(buf[:])
+		s.rounds(B)
 	} else {
-		// If there is no additional data, no padding is applied
+		// Pad
+		s[0] ^= 0x80 << 56
+		s.rounds(B)
 	}
 }
 
