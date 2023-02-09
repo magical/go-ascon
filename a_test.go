@@ -155,7 +155,7 @@ func TestGenKatAEAD(t *testing.T) {
 // TODO: test overlap
 
 func benchHash(b *testing.B, f func() hash.Hash, size int64) {
-	var tmp [Size]byte
+	var tmp [HashSize]byte
 	var msg [8192]byte
 	b.SetBytes(size)
 	h := f()

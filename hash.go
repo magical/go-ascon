@@ -5,7 +5,7 @@ package ascon
 
 import "hash"
 
-const Size = 256 / 8      // bytes
+const HashSize = 256 / 8  // bytes
 const BlockSize = 64 / 8  // bytes
 const stateSize = 320 / 8 // bytes
 
@@ -25,7 +25,7 @@ func NewHash() hash.Hash {
 }
 
 // The size of the final hash, in bytes.
-func (d *digest) Size() int { return Size }
+func (d *digest) Size() int { return HashSize }
 
 // The data rate of the sponge, in bytes.
 // Writes which are a multiple of BlockSize will be more performant.
@@ -107,7 +107,7 @@ func (d0 *digest) Sum(b []byte) []byte {
 	d.len = 0
 
 	// Squeeze
-	for i := 0; i < Size/8; i++ {
+	for i := 0; i < HashSize/8; i++ {
 		if i != 0 {
 			d.roundB()
 		}
