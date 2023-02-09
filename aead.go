@@ -67,31 +67,7 @@ func (aead *AEAD) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 	dst = append(dst, make([]byte, len(plaintext)+TagSize)...)
 
 	// Duplex plaintext/ciphertext
-	p := plaintext
-	c := dst[dstLen:]
-	for len(p) >= 8 {
-		s[0] ^= be64dec(p)
-		be64enc(c, s[0])
-		p = p[8:]
-		c = c[8:]
-		s.rounds(B)
-	}
-	if len(p) > 0 {
-		var buf [8]byte
-		n := copy(buf[:], p)
-		// Pad
-		buf[n] |= 0x80
-		s[0] ^= be64dec(buf[:])
-		// may write up to 7 too many bytes
-		// but it's okay because we have space reserved
-		// for the tag
-		be64enc(c, s[0])
-		c = c[n:]
-	} else {
-		// Pad
-		s[0] ^= 0x80 << 56
-	}
-	// note: no round is done after the final plaintext block
+	c := s.encrypt(plaintext, dst[dstLen:], B)
 
 	// mix the key in again
 	s[1] ^= be64dec(key[0:])
@@ -151,6 +127,35 @@ func (s *state) mixAdditionalData(additionalData []byte, B int) {
 	}
 }
 
+func (s *state) encrypt(plaintext, dst []byte, B int) []byte {
+	p := plaintext
+	c := dst
+	for len(p) >= 8 {
+		s[0] ^= be64dec(p)
+		be64enc(c, s[0])
+		p = p[8:]
+		c = c[8:]
+		s.rounds(B)
+	}
+	if len(p) > 0 {
+		var buf [8]byte
+		n := copy(buf[:], p)
+		// Pad
+		buf[n] |= 0x80
+		s[0] ^= be64dec(buf[:])
+		// may write up to 7 too many bytes
+		// but it's okay because we have space reserved
+		// for the tag
+		be64enc(c, s[0])
+		c = c[n:]
+	} else {
+		// Pad
+		s[0] ^= 0x80 << 56
+	}
+	// note: no round is done after the final plaintext block
+	return c
+}
+
 var fail = errors.New("ascon: decryption failed")
 
 func (aead *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, error) {
@@ -165,11 +170,10 @@ func (aead *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, e
 	}
 	plaintextSize := len(ciphertext) - TagSize
 	expectedTag := ciphertext[plaintextSize:]
-	c := ciphertext[0:plaintextSize]
+	ciphertext = ciphertext[0:plaintextSize]
 
 	dstLen := len(dst)
 	dst = append(dst, make([]byte, plaintextSize)...)
-	p := dst[dstLen:]
 
 	// Initialize
 	// IV || key || nonce
@@ -188,6 +192,36 @@ func (aead *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, e
 	s[4] ^= 1
 
 	// Duplex plaintext/ciphertext
+	s.decrypt(ciphertext, dst[dstLen:], B)
+
+	// mix the key in again
+	s[1] ^= be64dec(key[0:])
+	s[2] ^= be64dec(key[8:])
+
+	// Finalize
+	s.rounds(A)
+
+	// Compute tag
+	t0 := s[3] ^ be64dec(key[0:])
+	t1 := s[4] ^ be64dec(key[8:])
+	// Check tag in constant time
+	t0 ^= be64dec(expectedTag[0:])
+	t1 ^= be64dec(expectedTag[8:])
+	t := uint32(t0>>32) | uint32(t0)
+	t |= uint32(t1>>32) | uint32(t1)
+	if subtle.ConstantTimeEq(int32(t), 0) == 0 {
+		//t0 = s[3] ^ be64dec(key[0:])
+		//t1 = s[4] ^ be64dec(key[8:])
+		//return dst, fmt.Errorf("tag mismatch: got %016x %016x, want %x", t0, t1, expectedTag)
+		return dst, fail
+	}
+
+	return dst, nil
+}
+
+func (s *state) decrypt(ciphertext, dst []byte, B int) {
+	c := ciphertext
+	p := dst
 	for len(c) >= 8 {
 		x := be64dec(c)
 		be64enc(p, x^s[0])
@@ -213,30 +247,6 @@ func (aead *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, e
 		s[0] ^= 0x80 << 56
 	}
 	// note: no round is done after the final plaintext block
-
-	// mix the key in again
-	s[1] ^= be64dec(key[0:])
-	s[2] ^= be64dec(key[8:])
-
-	// Finalize
-	s.rounds(A)
-
-	// Compute tag
-	t0 := s[3] ^ be64dec(key[0:])
-	t1 := s[4] ^ be64dec(key[8:])
-	// Check tag in constant time
-	t0 ^= be64dec(expectedTag[0:])
-	t1 ^= be64dec(expectedTag[8:])
-	t := uint32(t0>>32) | uint32(t0)
-	t |= uint32(t1>>32) | uint32(t1)
-	if subtle.ConstantTimeEq(int32(t), 0) == 0 {
-		//t0 = s[3] ^ be64dec(key[0:])
-		//t1 = s[4] ^ be64dec(key[8:])
-		//return dst, fmt.Errorf("tag mismatch: got %016x %016x, want %x", t0, t1, expectedTag)
-		return dst, fail
-	}
-
-	return dst, nil
 }
 
 func (s *state) rounds(r int) { roundGeneric(s, roundc[12-r:]) }
