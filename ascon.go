@@ -2,14 +2,32 @@
 // All rights reserved. See LICENSE for details.
 
 // Ascon round function/permutation
+// https://ascon.iaik.tugraz.at/files/asconv12-nist.pdf
 
 package ascon
 
 import "math/bits"
 
-// https://ascon.iaik.tugraz.at/files/asconv12-nist.pdf
-
 type state [5]uint64
+
+// Section 2.6.1, Table 4 (page 13)
+// p12 uses 0..12
+// p8 uses 4..12
+// p6 uses 6..12
+var roundc = [12]uint8{
+	0x00000000000000f0,
+	0x00000000000000e1,
+	0x00000000000000d2,
+	0x00000000000000c3,
+	0x00000000000000b4,
+	0x00000000000000a5,
+	0x0000000000000096,
+	0x0000000000000087,
+	0x0000000000000078,
+	0x0000000000000069,
+	0x000000000000005a,
+	0x000000000000004b,
+}
 
 func roundGeneric(s *state, numRounds uint) {
 	var x0, x1, x2, x3, x4 uint64
@@ -52,7 +70,7 @@ func roundGeneric(s *state, numRounds uint) {
 		x3 ^= x2
 		x2 = ^x2
 
-		// Linear layer
+		// Section 2.6.3 Linear Diffusion Layer
 		x0 = x0 ^ bits.RotateLeft64(x0, -19) ^ bits.RotateLeft64(x0, -28)
 		x1 = x1 ^ bits.RotateLeft64(x1, -61) ^ bits.RotateLeft64(x1, -39)
 		x2 = x2 ^ bits.RotateLeft64(x2, -1) ^ bits.RotateLeft64(x2, -6)
