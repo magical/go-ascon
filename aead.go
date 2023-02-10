@@ -49,7 +49,7 @@ func (aead *AEAD) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 	// Initialize
 	// IV || key || nonce
 	var s state
-	A, B := 12, 6
+	const A, B uint = 12, 6
 	s.initAEAD(key, 64, uint8(A), uint8(B), nonce)
 	//log.Printf("%x\n", &s)
 
@@ -95,10 +95,10 @@ func (s *state) initAEAD(key []byte, blockSize, A, B uint8, nonce []byte) {
 	s[3] = be64dec(nonce[0:])
 	s[4] = be64dec(nonce[8:])
 	//log.Printf("%x\n", &s)
-	s.rounds(int(A))
+	s.rounds(uint(A))
 }
 
-func (s *state) mixAdditionalData(additionalData []byte, B int) {
+func (s *state) mixAdditionalData(additionalData []byte, B uint) {
 	ad := additionalData
 	if len(ad) <= 0 {
 		// If there is no additional data, nothing is added
@@ -127,7 +127,7 @@ func (s *state) mixAdditionalData(additionalData []byte, B int) {
 	}
 }
 
-func (s *state) encrypt(plaintext, dst []byte, B int) []byte {
+func (s *state) encrypt(plaintext, dst []byte, B uint) []byte {
 	p := plaintext
 	c := dst
 	for len(p) >= 8 {
@@ -178,7 +178,7 @@ func (aead *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, e
 	// Initialize
 	// IV || key || nonce
 	var s state
-	A, B := 12, 6
+	const A, B uint = 12, 6
 	s.initAEAD(key, 64, uint8(A), uint8(B), nonce)
 	//log.Printf("%x\n", &s)
 
@@ -219,7 +219,7 @@ func (aead *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, e
 	return dst, nil
 }
 
-func (s *state) decrypt(ciphertext, dst []byte, B int) {
+func (s *state) decrypt(ciphertext, dst []byte, B uint) {
 	c := ciphertext
 	p := dst
 	for len(c) >= 8 {
@@ -249,4 +249,4 @@ func (s *state) decrypt(ciphertext, dst []byte, B int) {
 	// note: no round is done after the final plaintext block
 }
 
-func (s *state) rounds(r int) { roundGeneric(s, roundc[12-r:]) }
+func (s *state) rounds(r uint) { roundGeneric(s, r) }

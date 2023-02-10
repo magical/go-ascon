@@ -1,6 +1,8 @@
 // Copyright © 2023 by Andrew Ekstedt <andrew.ekstedt@gmail.com>
 // All rights reserved. See LICENSE for details.
 
+// Ascon round function/permutation
+
 package ascon
 
 import "math/bits"
@@ -9,7 +11,7 @@ import "math/bits"
 
 type state [5]uint64
 
-func roundGeneric(s *state, rounds []uint8) {
+func roundGeneric(s *state, numRounds uint) {
 	var x0, x1, x2, x3, x4 uint64
 	x0 = s[0]
 	x1 = s[1]
@@ -17,7 +19,7 @@ func roundGeneric(s *state, rounds []uint8) {
 	x3 = s[3]
 	x4 = s[4]
 
-	for _, r := range rounds {
+	for _, r := range roundc[12-numRounds:] {
 		// Section 2.6.1, Addition of Constants (page 13)
 		x2 ^= uint64(r)
 

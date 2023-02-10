@@ -56,8 +56,8 @@ func (d *digest) initHash(blockSize, a, b uint8, h uint32) {
 	d.roundA()
 }
 
-func (d *digest) roundA() { roundGeneric(&d.s, roundc[:]) }
-func (d *digest) roundB() { roundGeneric(&d.s, roundc[12-d.b:]) }
+func (d *digest) roundA() { roundGeneric(&d.s, 12) }
+func (d *digest) roundB() { roundGeneric(&d.s, uint(d.b)) }
 
 func (d *digest) Write(b []byte) (int, error) {
 	written := len(b)
