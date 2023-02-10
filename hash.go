@@ -15,6 +15,8 @@ type digest struct {
 	buf [8]byte
 	len uint8 // number of bytes in buf
 	b   uint8 // number of rounds for the pB round function
+
+	doneWriting bool
 }
 
 func NewHash() hash.Hash {
@@ -41,9 +43,11 @@ func (d *digest) Reset() {
 	d.buf = [8]byte{}
 	d.len = 0
 	d.b = 12
+	d.doneWriting = false
 }
 
 // Ascon-Hash: l=256, hash=256, datablock=64, a=12, b=12
+// Ascon-Xof:  l=256, hash=0,   datablock=64, a=12, b=12
 
 func (d *digest) initHash(blockSize, a, b uint8, h uint32) {
 	d.s[0] = uint64(blockSize)<<48 + uint64(a)<<40 + uint64(a-b)<<32 + uint64(h)
@@ -59,6 +63,9 @@ func (d *digest) roundA() { roundGeneric(&d.s, 12) }
 func (d *digest) roundB() { roundGeneric(&d.s, uint(d.b)) }
 
 func (d *digest) Write(b []byte) (int, error) {
+	if d.doneWriting {
+		panic("ascon: Write called after Read")
+	}
 	written := len(b)
 	const bs = BlockSize
 	// try to empty the buffer, if it isn't empty already
@@ -86,9 +93,7 @@ func (d *digest) Write(b []byte) (int, error) {
 	return written, nil
 }
 
-func (d0 *digest) Sum(b []byte) []byte {
-	d := *d0
-
+func (d *digest) finish() {
 	if int(d.len) >= len(d.buf) {
 		panic("ascon: internal error")
 	}
@@ -104,6 +109,11 @@ func (d0 *digest) Sum(b []byte) []byte {
 	d.s[0] ^= be64dec(d.buf[0:])
 	d.roundA()
 	d.len = 0
+}
+
+func (d0 *digest) Sum(b []byte) []byte {
+	d := *d0
+	d.finish()
 
 	// Squeeze
 	for i := 0; i < HashSize/8; i++ {
@@ -113,4 +123,83 @@ func (d0 *digest) Sum(b []byte) []byte {
 		b = be64append(b, d.s[0])
 	}
 	return b
+}
+
+// Reads len(p) bytes of hash output. The error is always nil.
+func (d *digest) Read(p []byte) (int, error) {
+	if !d.doneWriting {
+		d.finish()
+		d.doneWriting = true
+	}
+	read := len(p)
+	if len(p) <= 0 {
+		return 0, nil
+	}
+
+	// Squeeze
+
+	// invariants:
+	//  if d.len == 8 then the buffer is empty and roundB has NOT been called since the previous block
+	//  if d.len == 0 then the buffer is empty and roundB HAS been called since the previous block, or this is the first block
+	//  if 0 < d.len < 8 then we have bytes to read in d.buf
+
+	// Copy out any leftover bytes from the previous block
+	const bs = BlockSize
+	if d.len > 0 && d.len < bs {
+		n := copy(p, d.buf[d.len:bs])
+		d.len += uint8(n)
+		if d.len < bs || len(p) == n {
+			return n, nil
+		}
+		p = p[n:]
+		// the buffer is empty. We still have bytes to read
+	}
+
+	// d.len == 0 or 8
+
+	// Copy whole blocks if we can
+	if len(p) >= 8 && d.len == 0 {
+		d.len = 8
+		be64enc(p, d.s[0])
+		p = p[8:]
+	}
+	for len(p) >= 8 {
+		d.roundB()
+		be64enc(p, d.s[0])
+		p = p[8:]
+	}
+
+	// Partial block
+	if len(p) > 0 {
+		// fill the buffer
+		if d.len == 8 {
+			d.roundB()
+		}
+		be64enc(d.buf[:], d.s[0])
+		n := copy(p, d.buf[:])
+		d.len = uint8(n)
+	}
+	return read, nil
+}
+
+// Reads len(p) bytes of hash output in one shot.
+// Must be a multiple of BlockSize.
+// Used for testing Read.
+func (d *digest) readAll(p []byte) {
+	if d.doneWriting {
+		panic("internal error")
+	}
+	d.finish()
+	d.doneWriting = true
+
+	if len(p)%BlockSize != 0 {
+		panic("internal error")
+	}
+
+	for i := 0; i < len(p); i += BlockSize {
+		if i != 0 {
+			d.roundB()
+		}
+		be64enc(p[i:], d.s[0])
+	}
 }

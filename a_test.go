@@ -62,6 +62,77 @@ func TestGenKat(t *testing.T) {
 	}
 }
 
+func TestGenKatXof(t *testing.T) {
+	f, err := os.Create("ascon_xof_kat.txt")
+	if err != nil {
+		t.Skip("couldn't create output file")
+	}
+	defer f.Close()
+	w := bufio.NewWriter(f)
+	defer w.Flush()
+	sum := make([]byte, 32)
+	for i := 0; i <= 1024; i++ {
+		b := make([]byte, i)
+		for j := range b {
+			b[j] = byte(j % 256)
+		}
+		fmt.Fprintf(w, "Count = %d\n", i+1)
+		fmt.Fprintf(w, "Msg = %X\n", b)
+		d := new(digest)
+		d.initHash(64, 12, 12, 0)
+		d.Write(b)
+		d.Read(sum)
+		fmt.Fprintf(w, "MD = %X\n", sum)
+		fmt.Fprintln(w)
+	}
+}
+
+func TestXofChunks(t *testing.T) {
+	init := new(digest)
+	init.initHash(64, 12, 12, 0)
+	init.Write([]byte("abc"))
+
+	const N = 2016
+
+	expected := make([]byte, N)
+	d := *init
+	d.readAll(expected)
+
+	for chunkSize := 1; chunkSize < N; chunkSize++ {
+		output := make([]byte, N)
+		d := *init
+		for i := 0; i < len(output); i += chunkSize {
+			end := i + chunkSize
+			if end > len(output) {
+				end = len(output)
+			}
+			nread, err := d.Read(output[i:end])
+			if len := end - i; nread != len || err != nil {
+				t.Errorf("Read(%d) returned n=%v, err=%v expected n=%v, err=nil", len, nread, err, len)
+			}
+		}
+		if !bytes.Equal(output, expected) {
+			t.Errorf("Chunked read of %d bytes: got %X, want %X", chunkSize, output, expected)
+		}
+	}
+
+	output := make([]byte, N)
+	d = *init
+	for i, j := 0, 0; i < len(output); i, j = i+j, j+1 {
+		end := i + j
+		if end > len(output) {
+			end = len(output)
+		}
+		d.Read(output[i:end])
+		if !bytes.Equal(output[i:end], expected[i:end]) {
+			t.Errorf("Read of %d bytes after %d: got %X, want %X", j, i, output[i:end], expected[i:end])
+		}
+	}
+	if !bytes.Equal(output, expected) {
+		t.Error("Chunked reads differ from expected")
+	}
+}
+
 func unhex(s string) []byte {
 	b, err := hex.DecodeString(s)
 	if err != nil {
@@ -207,3 +278,18 @@ func BenchmarkOpen_8(b *testing.B)  { benchOpen(b, 8) }
 func BenchmarkOpen_64(b *testing.B) { benchOpen(b, 64) }
 func BenchmarkOpen_1k(b *testing.B) { benchOpen(b, 1024) }
 func BenchmarkOpen_8k(b *testing.B) { benchOpen(b, 8192) }
+
+func benchRead(b *testing.B, size int64) {
+	b.SetBytes(size)
+	d := new(digest)
+	d.initHash(64, 12, 12, 0)
+	buf := make([]byte, size)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		d.Read(buf)
+	}
+}
+
+func BenchmarkXofReadUnaligned(b *testing.B) { benchRead(b, 31) } // 31 is a Mersenne prime
+func BenchmarkXofReadAligned(b *testing.B)   { benchRead(b, 32) }
+func BenchmarkXofReadLarge(b *testing.B)     { benchRead(b, 16<<10) }
