@@ -11,11 +11,10 @@ const stateSize = 320 / 8 // bytes
 
 // digest implements hash.Hash
 type digest struct {
-	s    state
-	buf  [8]byte
-	len  int   // number of bytes in buf
-	size int   // size of the output
-	b    uint8 // number of rounds for the pB round function
+	s   state
+	buf [8]byte
+	len int   // number of bytes in buf
+	b   uint8 // number of rounds for the pB round function
 }
 
 func NewHash() hash.Hash {
