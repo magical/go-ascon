@@ -13,6 +13,8 @@ const (
 	//BlockSize
 )
 
+// TODO: "The number of processed plaintext and associated data blocks protected by the encryption algorithm is limited to a total of 2^64 blocks per key, which corresponds to 2^67 bytes (for Ascon-128, Ascon-80pq) or 2^68 bytes (for Ascon-128a)." (section 3.1 )
+
 // AEAD provides an implementation of Ascon-128.
 // It implements the crypto/cipher.AEAD interface.
 type AEAD struct {
