@@ -13,7 +13,7 @@ const stateSize = 320 / 8 // bytes
 type digest struct {
 	s   state
 	buf [8]byte
-	len int   // number of bytes in buf
+	len uint8 // number of bytes in buf
 	b   uint8 // number of rounds for the pB round function
 }
 
@@ -62,9 +62,9 @@ func (d *digest) Write(b []byte) (int, error) {
 	written := len(b)
 	const bs = BlockSize
 	// try to empty the buffer, if it isn't empty already
-	if d.len > 0 && d.len+len(b) >= bs {
+	if d.len > 0 && int(d.len)+len(b) >= bs {
 		n := copy(d.buf[d.len:bs], b)
-		d.len += n
+		d.len += uint8(n)
 		b = b[n:]
 		if d.len == bs {
 			d.s[0] ^= be64dec(d.buf[0:])
@@ -81,7 +81,7 @@ func (d *digest) Write(b []byte) (int, error) {
 	// store any remaining bytes in the buffer
 	if len(b) > 0 {
 		n := copy(d.buf[d.len:bs], b)
-		d.len += n
+		d.len += uint8(n)
 	}
 	return written, nil
 }
@@ -89,7 +89,7 @@ func (d *digest) Write(b []byte) (int, error) {
 func (d0 *digest) Sum(b []byte) []byte {
 	d := *d0
 
-	if d.len >= len(d.buf) {
+	if int(d.len) >= len(d.buf) {
 		panic("ascon: internal error")
 	}
 
