@@ -37,13 +37,13 @@ func (a *AEAD) SetKey(key []byte) {
 	copy(a.key[:], key)
 }
 
-func (_ *AEAD) NonceSize() int { return NonceSize }
-func (_ *AEAD) Overhead() int  { return TagSize }
+func (*AEAD) NonceSize() int { return NonceSize }
+func (*AEAD) Overhead() int  { return TagSize }
 
 // Seal encrypts and authenticates a plaintext
 // and appends ciphertext to dst, returning the appended slice.
-func (aead *AEAD) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
-	key := aead.key[:]
+func (a *AEAD) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
+	key := a.key[:]
 	if len(nonce) != NonceSize {
 		panic(fmt.Sprintf("ascon: bad nonce (len %d)", len(nonce)))
 	}
@@ -160,8 +160,8 @@ func (s *state) encrypt(plaintext, dst []byte, B uint) []byte {
 
 var fail = errors.New("ascon: decryption failed")
 
-func (aead *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, error) {
-	key := aead.key[:]
+func (a *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, error) {
+	key := a.key[:]
 	if len(nonce) != NonceSize {
 		panic(fmt.Sprintf("ascon: bad nonce (len %d)", len(nonce)))
 		// return fail?

@@ -3,8 +3,6 @@
 
 package ascon
 
-import "hash"
-
 const HashSize = 256 / 8  // bytes
 const BlockSize = 64 / 8  // bytes
 const stateSize = 320 / 8 // bytes
@@ -19,30 +17,76 @@ type digest struct {
 	doneWriting bool
 }
 
-func NewHash() hash.Hash {
-	d := new(digest)
-	d.Reset()
-	return d
+type Hash struct{ digest }
+
+func NewHash() *Hash {
+	h := new(Hash)
+	h.digest.reset(12)
+	return h
+}
+
+func NewHasha() *Hash {
+	h := new(Hash)
+	h.digest.reset(8)
+	return h
 }
 
 // The size of the final hash, in bytes.
-func (d *digest) Size() int { return HashSize }
+func (h *Hash) Size() int { return HashSize }
+
+func (h *Hash) Reset() { h.digest.reset(h.b) }
+
+func (h *Hash) Write(p []byte) (int, error) {
+	h.digest.write(p)
+	return len(p), nil
+}
+
+// Xof is an implementation of the Ascon-Xof arbitrary-length hash algorithm.
+// It implements the golang.org/x/crypto/sha3.ShakeHash interface except for Clone.
+type Xof struct{ digest }
+
+func NewXof() *Xof {
+	x := new(Xof)
+	x.Reset()
+	return x
+}
+
+func (x *Xof) Reset() {
+	x.digest.initHash(64, 12, 12, 0)
+	x.digest.len = 0
+	x.digest.doneWriting = false
+}
+
+func (x *Xof) Write(p []byte) (int, error) {
+	x.digest.write(p)
+	return len(p), nil
+}
+
+func (x *Xof) Read(p []byte) (int, error) {
+	x.digest.read(p)
+	return len(p), nil
+}
 
 // The data rate of the sponge, in bytes.
 // Writes which are a multiple of BlockSize will be more performant.
 func (d *digest) BlockSize() int { return BlockSize }
 
-func (d *digest) Reset() {
+func (d *digest) reset(b uint8) {
 	//fmt.Println("resetting")
 	//d.initHash(BlockSize*8, 12, 12, Size*8)
-	d.s[0] = 0xee9398aadb67f03d
-	d.s[1] = 0x8bb21831c60f1002
-	d.s[2] = 0xb48a92db98d5da62
-	d.s[3] = 0x43189921b8f8e3e8
-	d.s[4] = 0x348fa5c9d525e140
+	switch b {
+	case 12:
+		d.s[0] = 0xee9398aadb67f03d
+		d.s[1] = 0x8bb21831c60f1002
+		d.s[2] = 0xb48a92db98d5da62
+		d.s[3] = 0x43189921b8f8e3e8
+		d.s[4] = 0x348fa5c9d525e140
+		d.b = b
+	default:
+		d.initHash(BlockSize*8, 12, b, 256)
+	}
 	d.buf = [8]byte{}
 	d.len = 0
-	d.b = 12
 	d.doneWriting = false
 }
 
@@ -62,7 +106,7 @@ func (d *digest) initHash(blockSize, a, b uint8, h uint32) {
 func (d *digest) roundA() { roundGeneric(&d.s, 12) }
 func (d *digest) roundB() { roundGeneric(&d.s, uint(d.b)) }
 
-func (d *digest) Write(b []byte) (int, error) {
+func (d *digest) write(b []byte) (int, error) {
 	if d.doneWriting {
 		panic("ascon: Write called after Read")
 	}
@@ -126,7 +170,7 @@ func (d0 *digest) Sum(b []byte) []byte {
 }
 
 // Reads len(p) bytes of hash output. The error is always nil.
-func (d *digest) Read(p []byte) (int, error) {
+func (d *digest) read(p []byte) (int, error) {
 	if !d.doneWriting {
 		d.finish()
 		d.doneWriting = true

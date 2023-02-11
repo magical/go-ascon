@@ -9,15 +9,14 @@ import (
 	"crypto/cipher"
 	"encoding/hex"
 	"fmt"
-	"hash"
 	"os"
 	"testing"
 )
 
 func TestInit(t *testing.T) {
-	d := NewHash().(*digest)
-	//d.initHash(64, 12, 12, 256)
-	got := d.s
+	h := NewHash()
+	//h.initHash(64, 12, 12, 256)
+	got := h.s
 	want := [5]uint64{0xee9398aadb67f03d, 0x8bb21831c60f1002, 0xb48a92db98d5da62, 0x43189921b8f8e3e8, 0x348fa5c9d525e140}
 	for i := range got {
 		if got[i] != want[i] {
@@ -35,10 +34,9 @@ func TestHash(t *testing.T) {
 }
 
 func hashBytes(b []byte) []byte {
-	d := new(digest)
-	d.initHash(64, 12, 12, 256)
-	d.Write(b)
-	return d.Sum(nil)
+	h := NewHash()
+	h.Write(b)
+	return h.Sum(nil)
 }
 
 // compare against https://raw.githubusercontent.com/ascon/ascon-c/main/crypto_hash/asconhashv12/LWC_HASH_KAT_256.txt
@@ -78,18 +76,16 @@ func TestGenKatXof(t *testing.T) {
 		}
 		fmt.Fprintf(w, "Count = %d\n", i+1)
 		fmt.Fprintf(w, "Msg = %X\n", b)
-		d := new(digest)
-		d.initHash(64, 12, 12, 0)
-		d.Write(b)
-		d.Read(sum)
+		x := NewXof()
+		x.Write(b)
+		x.Read(sum)
 		fmt.Fprintf(w, "MD = %X\n", sum)
 		fmt.Fprintln(w)
 	}
 }
 
 func TestXofChunks(t *testing.T) {
-	init := new(digest)
-	init.initHash(64, 12, 12, 0)
+	init := NewXof()
 	init.Write([]byte("abc"))
 
 	const N = 2016
@@ -225,7 +221,7 @@ func TestGenKatAEAD(t *testing.T) {
 
 // TODO: test overlap
 
-func benchHash(b *testing.B, f func() hash.Hash, size int64) {
+func benchHash(b *testing.B, f func() *Hash, size int64) {
 	var tmp [HashSize]byte
 	var msg [8192]byte
 	b.SetBytes(size)
@@ -281,12 +277,11 @@ func BenchmarkOpen_8k(b *testing.B) { benchOpen(b, 8192) }
 
 func benchRead(b *testing.B, size int64) {
 	b.SetBytes(size)
-	d := new(digest)
-	d.initHash(64, 12, 12, 0)
+	x := NewXof()
 	buf := make([]byte, size)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		d.Read(buf)
+		x.Read(buf)
 	}
 }
 
