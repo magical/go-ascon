@@ -33,6 +33,19 @@ func TestHash(t *testing.T) {
 	}
 }
 
+func TestHasha(t *testing.T) {
+	h := NewHasha()
+	want := "AECD027026D0675F9DE7A8AD8CCF512DB64B1EDCF0B20C388A0C7CC617AAA2C4"
+	got := fmt.Sprintf("%X", h.Sum(nil))
+	if got != want {
+		t.Errorf("got %s, want %s", got, want)
+	}
+	got = fmt.Sprintf("%X", h.Sum(nil))
+	if got != want {
+		t.Errorf("2nd call; got %s, want %s", got, want)
+	}
+}
+
 func hashBytes(b []byte) []byte {
 	h := NewHash()
 	h.Write(b)
@@ -237,6 +250,11 @@ func BenchmarkHash256_8(b *testing.B)  { benchHash(b, NewHash, 8) }
 func BenchmarkHash256_64(b *testing.B) { benchHash(b, NewHash, 64) }
 func BenchmarkHash256_1k(b *testing.B) { benchHash(b, NewHash, 1024) }
 func BenchmarkHash256_8k(b *testing.B) { benchHash(b, NewHash, 8192) }
+
+func BenchmarkHasha256_8(b *testing.B)  { benchHash(b, NewHasha, 8) }
+func BenchmarkHasha256_64(b *testing.B) { benchHash(b, NewHasha, 64) }
+func BenchmarkHasha256_1k(b *testing.B) { benchHash(b, NewHasha, 1024) }
+func BenchmarkHasha256_8k(b *testing.B) { benchHash(b, NewHasha, 8192) }
 
 func benchSeal(b *testing.B, size int64) {
 	var dst = make([]byte, size+TagSize)

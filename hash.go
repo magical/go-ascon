@@ -82,6 +82,13 @@ func (d *digest) reset(b uint8) {
 		d.s[3] = 0x43189921b8f8e3e8
 		d.s[4] = 0x348fa5c9d525e140
 		d.b = b
+	case 8:
+		d.s[0] = 0x01470194fc6528a6
+		d.s[1] = 0x738ec38ac0adffa7
+		d.s[2] = 0x2ec8e3296c76384c
+		d.s[3] = 0xd6f6a54d7f52377d
+		d.s[4] = 0xa13c42a223be8d87
+		d.b = b
 	default:
 		d.initHash(BlockSize*8, 12, b, 256)
 	}
