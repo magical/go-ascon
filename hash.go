@@ -36,6 +36,10 @@ func (h *Hash) Size() int { return HashSize }
 
 func (h *Hash) Reset() { h.digest.reset(h.digest.b) }
 
+// Sum appends a message digest to [b] and returns the new slice.
+// Does not modify the hash state.
+func (h *Hash) Sum(b []byte) []byte { return h.digest.sum(b) }
+
 func (h *Hash) Write(p []byte) (int, error) {
 	if h.digest.b == 0 {
 		h.Reset()
@@ -172,7 +176,7 @@ func (d *digest) finish() {
 	d.len = 0
 }
 
-func (d0 *digest) Sum(b []byte) []byte {
+func (d0 *digest) sum(b []byte) []byte {
 	d := *d0
 	d.finish()
 
