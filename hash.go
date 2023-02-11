@@ -45,7 +45,7 @@ func (h *Hash) Write(p []byte) (int, error) {
 }
 
 // Xof is an implementation of the Ascon-Xof arbitrary-length hash algorithm.
-// It implements the golang.org/x/crypto/sha3.ShakeHash interface except for Clone.
+// It implements the golang.org/x/crypto/sha3.ShakeHash interface (minus Clone).
 type Xof struct{ digest }
 
 func NewXof() *Xof {
