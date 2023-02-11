@@ -31,7 +31,7 @@ func NewAEAD(key []byte) (*AEAD, error) {
 // Sets the key to a new value.
 // This method is not safe for concurrent use with other methods.
 func (a *AEAD) SetKey(key []byte) {
-	if len(key) != 16 {
+	if len(key) != KeySize {
 		panic("ascon: wrong key size")
 	}
 	copy(a.key[:], key)
@@ -43,7 +43,6 @@ func (*AEAD) Overhead() int  { return TagSize }
 // Seal encrypts and authenticates a plaintext
 // and appends ciphertext to dst, returning the appended slice.
 func (a *AEAD) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
-	key := a.key[:]
 	if len(nonce) != NonceSize {
 		panic(fmt.Sprintf("ascon: bad nonce (len %d)", len(nonce)))
 	}
@@ -52,12 +51,14 @@ func (a *AEAD) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 	// IV || key || nonce
 	var s state
 	const A, B uint = 12, 6
-	s.initAEAD(key, 64, uint8(A), uint8(B), nonce)
+	s.initAEAD(a.key[:], 64, uint8(A), uint8(B), nonce)
 	//log.Printf("%x\n", &s)
 
 	// mix the key in again
-	s[3] ^= be64dec(key[0:])
-	s[4] ^= be64dec(key[8:])
+	k0 := be64dec(a.key[0:])
+	k1 := be64dec(a.key[8:])
+	s[3] ^= k0
+	s[4] ^= k1
 
 	// Absorb additionalData
 	s.mixAdditionalData(additionalData, B)
@@ -72,15 +73,15 @@ func (a *AEAD) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 	c := s.encrypt(plaintext, dst[dstLen:], B)
 
 	// mix the key in again
-	s[1] ^= be64dec(key[0:])
-	s[2] ^= be64dec(key[8:])
+	s[1] ^= k0
+	s[2] ^= k1
 
 	// Finalize
 	s.rounds(A)
 
 	// Append tag
-	t0 := s[3] ^ be64dec(key[0:])
-	t1 := s[4] ^ be64dec(key[8:])
+	t0 := s[3] ^ k0
+	t1 := s[4] ^ k1
 	be64enc(c[0:], t0)
 	be64enc(c[8:], t1)
 
@@ -161,7 +162,6 @@ func (s *state) encrypt(plaintext, dst []byte, B uint) []byte {
 var fail = errors.New("ascon: decryption failed")
 
 func (a *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, error) {
-	key := a.key[:]
 	if len(nonce) != NonceSize {
 		panic(fmt.Sprintf("ascon: bad nonce (len %d)", len(nonce)))
 		// return fail?
@@ -181,12 +181,14 @@ func (a *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, erro
 	// IV || key || nonce
 	var s state
 	const A, B uint = 12, 6
-	s.initAEAD(key, 64, uint8(A), uint8(B), nonce)
+	s.initAEAD(a.key[:], 64, uint8(A), uint8(B), nonce)
 	//log.Printf("%x\n", &s)
 
 	// mix the key in again
-	s[3] ^= be64dec(key[0:])
-	s[4] ^= be64dec(key[8:])
+	k0 := be64dec(a.key[0:])
+	k1 := be64dec(a.key[8:])
+	s[3] ^= k0
+	s[4] ^= k1
 
 	// Absorb additionalData
 	s.mixAdditionalData(additionalData, B)
@@ -197,23 +199,23 @@ func (a *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, erro
 	s.decrypt(ciphertext, dst[dstLen:], B)
 
 	// mix the key in again
-	s[1] ^= be64dec(key[0:])
-	s[2] ^= be64dec(key[8:])
+	s[1] ^= k0
+	s[2] ^= k1
 
 	// Finalize
 	s.rounds(A)
 
 	// Compute tag
-	t0 := s[3] ^ be64dec(key[0:])
-	t1 := s[4] ^ be64dec(key[8:])
+	t0 := s[3] ^ k0
+	t1 := s[4] ^ k1
 	// Check tag in constant time
 	t0 ^= be64dec(expectedTag[0:])
 	t1 ^= be64dec(expectedTag[8:])
 	t := uint32(t0>>32) | uint32(t0)
 	t |= uint32(t1>>32) | uint32(t1)
 	if subtle.ConstantTimeEq(int32(t), 0) == 0 {
-		//t0 = s[3] ^ be64dec(key[0:])
-		//t1 = s[4] ^ be64dec(key[8:])
+		//t0 = s[3] ^ k0
+		//t1 = s[4] ^ k1
 		//return dst, fmt.Errorf("tag mismatch: got %016x %016x, want %x", t0, t1, expectedTag)
 		return dst, fail
 	}
