@@ -125,11 +125,10 @@ func (d *digest) initHash(blockSize, a, b uint8, h uint32) {
 func (d *digest) roundA() { roundGeneric(&d.s, 12) }
 func (d *digest) roundB() { roundGeneric(&d.s, uint(d.b)) }
 
-func (d *digest) write(b []byte) (int, error) {
+func (d *digest) write(b []byte) {
 	if d.doneWriting {
 		panic("ascon: Write called after Read")
 	}
-	written := len(b)
 	const bs = BlockSize
 	// try to empty the buffer, if it isn't empty already
 	if d.len > 0 && int(d.len)+len(b) >= bs {
@@ -153,7 +152,6 @@ func (d *digest) write(b []byte) (int, error) {
 		n := copy(d.buf[d.len:bs], b)
 		d.len += uint8(n)
 	}
-	return written, nil
 }
 
 func (d *digest) finish() {
@@ -189,14 +187,13 @@ func (d0 *digest) Sum(b []byte) []byte {
 }
 
 // Reads len(p) bytes of hash output. The error is always nil.
-func (d *digest) read(p []byte) (int, error) {
+func (d *digest) read(p []byte) {
 	if !d.doneWriting {
 		d.finish()
 		d.doneWriting = true
 	}
-	read := len(p)
 	if len(p) <= 0 {
-		return 0, nil
+		return
 	}
 
 	// Squeeze
@@ -212,7 +209,7 @@ func (d *digest) read(p []byte) (int, error) {
 		n := copy(p, d.buf[d.len:bs])
 		d.len += uint8(n)
 		if d.len < bs || len(p) == n {
-			return n, nil
+			return
 		}
 		p = p[n:]
 		// the buffer is empty. We still have bytes to read
@@ -242,7 +239,6 @@ func (d *digest) read(p []byte) (int, error) {
 		n := copy(p, d.buf[:])
 		d.len = uint8(n)
 	}
-	return read, nil
 }
 
 // Reads len(p) bytes of hash output in one shot.
