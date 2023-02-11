@@ -34,9 +34,12 @@ func NewHasha() *Hash {
 // The size of the final hash, in bytes.
 func (h *Hash) Size() int { return HashSize }
 
-func (h *Hash) Reset() { h.digest.reset(h.b) }
+func (h *Hash) Reset() { h.digest.reset(h.digest.b) }
 
 func (h *Hash) Write(p []byte) (int, error) {
+	if h.digest.b == 0 {
+		h.Reset()
+	}
 	h.digest.write(p)
 	return len(p), nil
 }
@@ -58,11 +61,17 @@ func (x *Xof) Reset() {
 }
 
 func (x *Xof) Write(p []byte) (int, error) {
+	if x.digest.b == 0 {
+		x.Reset()
+	}
 	x.digest.write(p)
 	return len(p), nil
 }
 
 func (x *Xof) Read(p []byte) (int, error) {
+	if x.digest.b == 0 {
+		x.Reset()
+	}
 	x.digest.read(p)
 	return len(p), nil
 }
@@ -75,6 +84,9 @@ func (d *digest) reset(b uint8) {
 	//fmt.Println("resetting")
 	//d.initHash(BlockSize*8, 12, 12, Size*8)
 	switch b {
+	case 0:
+		b = 12
+		fallthrough
 	case 12:
 		d.s[0] = 0xee9398aadb67f03d
 		d.s[1] = 0x8bb21831c60f1002
