@@ -73,7 +73,7 @@ func benchMAC(b *testing.B, size int64) {
 	init := NewMAC(key)
 	for i := 0; i < b.N; i++ {
 		//h.Reset()
-		h := *init
+		h := init.Clone()
 		h.Write(msg)
 		out = h.Sum(out[:0])
 	}

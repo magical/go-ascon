@@ -104,12 +104,12 @@ func TestXofChunks(t *testing.T) {
 	const N = 2016
 
 	expected := make([]byte, N)
-	d := *init
+	d := init.Clone()
 	d.readAll(expected)
 
 	for chunkSize := 1; chunkSize < N; chunkSize++ {
 		output := make([]byte, N)
-		d := *init
+		d := init.Clone()
 		for i := 0; i < len(output); i += chunkSize {
 			end := i + chunkSize
 			if end > len(output) {
@@ -126,7 +126,7 @@ func TestXofChunks(t *testing.T) {
 	}
 
 	output := make([]byte, N)
-	d = *init
+	d = init.Clone()
 	for i, j := 0, 0; i < len(output); i, j = i+j, j+1 {
 		end := i + j
 		if end > len(output) {

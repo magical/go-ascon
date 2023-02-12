@@ -40,6 +40,12 @@ func (h *Hash) Reset() { h.digest.reset(h.digest.b) }
 // Does not modify the hash state.
 func (h *Hash) Sum(b []byte) []byte { return h.digest.sum(b) }
 
+// Clone returns a new copy of h.
+func (h *Hash) Clone() *Hash {
+	new := *h
+	return &new
+}
+
 func (h *Hash) Write(p []byte) (int, error) {
 	if h.digest.b == 0 {
 		h.Reset()
@@ -56,6 +62,12 @@ func NewXof() *Xof {
 	x := new(Xof)
 	x.Reset()
 	return x
+}
+
+// Clone returns a new copy of x.
+func (x *Xof) Clone() *Xof {
+	new := *x
+	return &new
 }
 
 func (x *Xof) Reset() {

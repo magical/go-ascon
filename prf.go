@@ -24,6 +24,12 @@ func NewMAC(key []byte) *MAC {
 func (d *MAC) BlockSize() int { return len(d.buf) }
 func (d *MAC) Size() int      { return TagSize }
 
+// Clone returns a new copy of d.
+func (d *MAC) Clone() *MAC {
+	new := *d
+	return &new
+}
+
 // TODO: Reset? we would have to store the key or the initial state somewhere
 
 func (d *MAC) Write(p []byte) (int, error) {
