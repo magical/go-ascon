@@ -52,9 +52,10 @@ func TestHasha(t *testing.T) {
 	if got != want {
 		t.Errorf("got %s, want %s", got, want)
 	}
+	// check that Sum is idempotent
 	got = fmt.Sprintf("%X", h.Sum(nil))
 	if got != want {
-		t.Errorf("2nd call; got %s, want %s", got, want)
+		t.Errorf("got %s, want %s", got, want)
 	}
 }
 
