@@ -3,6 +3,8 @@
 
 package ascon
 
+import "crypto/subtle"
+
 // Ascon-PRF and Ascon-MAC are specified in "Ascon PRF, MAC, and Short-Input MAC"
 // by Christoph Dobraunig and Maria Eichlseder and Florian Mendel and Martin Schläffer.
 // https://eprint.iacr.org/2021/1574
@@ -13,8 +15,16 @@ type MAC struct {
 	len uint8 // number of bytes in buf
 }
 
+func NewMAC(key []byte) *MAC {
+	d := new(MAC)
+	d.initMAC(key)
+	return d
+}
+
 func (d *MAC) BlockSize() int { return len(d.buf) }
 func (d *MAC) Size() int      { return TagSize }
+
+// TODO: Reset? we would have to store the key or the initial state somewhere
 
 func (d *MAC) Write(p []byte) (int, error) {
 	d.write(p)
@@ -104,6 +114,25 @@ func (d0 *MAC) Sum(b []byte) []byte {
 	b = be64append(b, d.s[1])
 
 	return b
+}
+
+// Verify reports whether the MAC of the previously written bytes is equal to the provided MAC.
+// It does not modify the object state.
+func (d0 *MAC) Verify(mac []byte) (ok bool) {
+	if len(mac) != TagSize {
+		// panic?
+		return false
+	}
+	d := *d0
+	d.finish()
+
+	// Get the tag and xor with the expected tag
+	t0 := d.s[0] ^ be64dec(mac[0:])
+	t1 := d.s[1] ^ be64dec(mac[8:])
+	// Constant-time comparison
+	t := uint32(t0>>32) | uint32(t0)
+	t |= uint32(t1>>32) | uint32(t1)
+	return subtle.ConstantTimeEq(int32(t), 0) != 0
 }
 
 func (d *MAC) round() { d.s.rounds(12) }

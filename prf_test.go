@@ -19,11 +19,17 @@ func TestMAC(t *testing.T) {
 		}
 		return b
 	}
-	m := new(MAC)
-	m.initMAC(mk(16))
+	m := NewMAC(mk(16))
 	got := fmt.Sprintf("%X", m.Sum(nil))
 	if got != want {
 		t.Errorf("got %s, want %s", got, want)
+	}
+
+	if ok := m.Verify(unhex(want)); ok != true {
+		t.Errorf("Verify(mac) = %t, want %t", ok, true)
+	}
+	if ok := m.Verify(mk(16)); ok != false {
+		t.Errorf("Verify(bad mac) = %t, want %t", ok, false)
 	}
 }
 
@@ -48,8 +54,7 @@ func TestGenKatMAC(t *testing.T) {
 		fmt.Fprintf(w, "Count = %d\n", i+1)
 		fmt.Fprintf(w, "Key = %X\n", key)
 		fmt.Fprintf(w, "Msg = %X\n", b)
-		m := new(MAC)
-		m.initMAC(key)
+		m := NewMAC(key)
 		m.Write(b)
 		fmt.Fprintf(w, "Tag = %X\n", m.Sum(nil))
 		fmt.Fprintln(w)
@@ -65,8 +70,7 @@ func benchMAC(b *testing.B, size int64) {
 		key[i] = byte(i % 256)
 	}
 	b.ResetTimer()
-	init := new(MAC)
-	init.initMAC(key)
+	init := NewMAC(key)
 	for i := 0; i < b.N; i++ {
 		//h.Reset()
 		h := *init
