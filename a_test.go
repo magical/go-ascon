@@ -8,10 +8,13 @@ import (
 	"bytes"
 	"crypto/cipher"
 	"encoding/hex"
+	"flag"
 	"fmt"
 	"os"
 	"testing"
 )
+
+var genkat = flag.Bool("genkat", false, "generate KAT files")
 
 func TestInit(t *testing.T) {
 	// Test that the hardcoded initial state equals the computed values
@@ -66,10 +69,13 @@ func hashBytes(b []byte) []byte {
 }
 
 // compare against https://raw.githubusercontent.com/ascon/ascon-c/main/crypto_hash/asconhashv12/LWC_HASH_KAT_256.txt
-func TestGenKat(t *testing.T) {
+func TestGenKatHash(t *testing.T) {
+	if !*genkat {
+		t.Skip("skipping without -genkat flag")
+	}
 	f, err := os.Create("ascon_hash_kat.txt")
 	if err != nil {
-		t.Skip("couldn't create output file")
+		t.Fatal(err)
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
@@ -87,9 +93,12 @@ func TestGenKat(t *testing.T) {
 }
 
 func TestGenKatXof(t *testing.T) {
+	if !*genkat {
+		t.Skip("skipping without -genkat flag")
+	}
 	f, err := os.Create("ascon_xof_kat.txt")
 	if err != nil {
-		t.Skip("couldn't create output file")
+		t.Fatal(err)
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
@@ -195,9 +204,12 @@ func TestAEAD(t *testing.T) {
 }
 
 func TestGenKatAEAD(t *testing.T) {
+	if !*genkat {
+		t.Skip("skipping without -genkat flag")
+	}
 	f, err := os.Create("ascon_aead_kat.txt")
 	if err != nil {
-		t.Skip("couldn't create output file")
+		t.Fatal(err)
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
@@ -230,6 +242,7 @@ func TestGenKatAEAD(t *testing.T) {
 			fmt.Fprintln(w)
 			num += 1
 
+			// TODO: do these tests even without -genkat
 			if d, err := a.Open(nil, nonce, c, ad); err != nil {
 				t.Errorf("decryption failed (Count = %d): %v", num, err)
 			} else if !bytes.Equal(d, msg) {

@@ -35,9 +35,12 @@ func TestMAC(t *testing.T) {
 
 // compare against https://raw.githubusercontent.com/ascon/ascon-c/main/crypto_auth/asconmacv12/LWC_AUTH_KAT_128_128.txt
 func TestGenKatMAC(t *testing.T) {
+	if !*genkat {
+		t.Skip("skipping without -genkat flag")
+	}
 	f, err := os.Create("ascon_mac_kat.txt")
 	if err != nil {
-		t.Skip("couldn't create output file")
+		t.Fatal(err)
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
