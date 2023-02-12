@@ -14,13 +14,25 @@ import (
 )
 
 func TestInit(t *testing.T) {
+	// Test that the hardcoded initial state equals the computed values
 	h := NewHash()
-	//h.initHash(64, 12, 12, 256)
+	g := new(Hash)
+	g.initHash(64, 12, 12, 256)
 	got := h.s
-	want := [5]uint64{0xee9398aadb67f03d, 0x8bb21831c60f1002, 0xb48a92db98d5da62, 0x43189921b8f8e3e8, 0x348fa5c9d525e140}
+	want := g.s
 	for i := range got {
 		if got[i] != want[i] {
-			t.Errorf("s[%d] = %016x, want %016x", i, got[i], want[i])
+			t.Errorf("Hash: s[%d] = %016x, want %016x", i, got[i], want[i])
+		}
+	}
+
+	h = NewHasha()
+	got = h.s
+	g.initHash(64, 12, 8, 256)
+	want = g.s
+	for i := range got {
+		if got[i] != want[i] {
+			t.Errorf("Hasha: s[%d] = %016x, want %016x", i, got[i], want[i])
 		}
 	}
 }
@@ -200,7 +212,6 @@ func TestGenKatAEAD(t *testing.T) {
 	}
 	for i := 0; i <= 32; i++ {
 		for j := 0; j <= 32; j++ {
-
 			key := mk(16)
 			nonce := mk(16)
 			msg := mk(i)
