@@ -235,10 +235,11 @@ func TestGenKatAEAD(t *testing.T) {
 // TODO: test overlap
 
 func benchHash(b *testing.B, f func() *Hash, size int64) {
-	var tmp [HashSize]byte
-	var msg [8192]byte
 	b.SetBytes(size)
+	var tmp = make([]byte, 0, HashSize)
+	var msg = make([]byte, size)
 	h := f()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		h.Reset()
 		h.Write(msg[:size])
@@ -257,11 +258,12 @@ func BenchmarkHasha256_1k(b *testing.B) { benchHash(b, NewHasha, 1024) }
 func BenchmarkHasha256_8k(b *testing.B) { benchHash(b, NewHasha, 8192) }
 
 func benchSeal(b *testing.B, size int64) {
-	var dst = make([]byte, size+TagSize)
-	var msg = make([]byte, size)
 	b.SetBytes(size)
+	var nonce = make([]byte, NonceSize)
+	var dst = make([]byte, 0, size+TagSize)
+	var msg = make([]byte, size)
 	a := new(AEAD)
-	nonce := make([]byte, NonceSize)
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		a.Seal(dst[:0], nonce, msg, nil)
 	}
@@ -273,13 +275,12 @@ func BenchmarkSeal_1k(b *testing.B) { benchSeal(b, 1024) }
 func BenchmarkSeal_8k(b *testing.B) { benchSeal(b, 8192) }
 
 func benchOpen(b *testing.B, size int64) {
-	b.StopTimer()
 	b.SetBytes(size)
+	var nonce = make([]byte, NonceSize)
 	var msg = make([]byte, size)
 	a := new(AEAD)
-	nonce := make([]byte, NonceSize)
 	ciphertext := a.Seal(nil, nonce, msg, nil)
-	b.StartTimer()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, err := a.Open(msg[:0], nonce, ciphertext, nil)
 		if err != nil {
@@ -295,8 +296,8 @@ func BenchmarkOpen_8k(b *testing.B) { benchOpen(b, 8192) }
 
 func benchRead(b *testing.B, size int64) {
 	b.SetBytes(size)
+	var buf = make([]byte, size)
 	x := NewXof()
-	buf := make([]byte, size)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		x.Read(buf)

@@ -69,8 +69,8 @@ func benchMAC(b *testing.B, size int64) {
 	for i := range key {
 		key[i] = byte(i % 256)
 	}
-	b.ResetTimer()
 	init := NewMAC(key)
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		//h.Reset()
 		h := init.Clone()
