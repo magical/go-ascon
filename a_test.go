@@ -40,25 +40,71 @@ func TestInit(t *testing.T) {
 	}
 }
 
+var hashTests = []struct {
+	msgLen    int
+	hexDigest string
+}{
+	{0, "7346BC14F036E87AE03D0997913088F5F68411434B3CF8B54FA796A80D251F91"},
+	{1, "8DD446ADA58A7740ECF56EB638EF775F7D5C0FD5F0C2BBBDFDEC29609D3C43A2"},
+	{7, "DD409CCC0C60CD7F474C0BEED1E1CD48140AD45D5136DC5FDA5EBE283DF8D3F6"},
+	{8, "F4C6A44B29915D3D57CF928A18EC6226BB8DD6C1136ACD24965F7E7780CD69CF"},
+	{15, "9E48E03E8AAE0B9930DFF1E801007BC7105D6BD6CAAF16E3C31569D8942FC423"},
+	{16, "D4E56C4841E2A0069D4F07E61B2DCA94FD6D3F9C0DF78393E6E8292921BC841D"},
+	{100, "809CFCD3619777D73B162109EFCE633B272C8AFF18578D0169CB99F4783D136E"},
+}
+
 func TestHash(t *testing.T) {
-	want := "7346BC14F036E87AE03D0997913088F5F68411434B3CF8B54FA796A80D251F91"
-	got := fmt.Sprintf("%X", hashBytes(nil))
-	if got != want {
-		t.Errorf("got %s, want %s", got, want)
+	for _, tt := range hashTests {
+		msg := make([]byte, tt.msgLen)
+		for i := range msg {
+			msg[i] = byte(i)
+		}
+		want := tt.hexDigest
+		h := NewHash()
+		h.Write(msg)
+		got := fmt.Sprintf("%X", h.Sum(nil))
+		if got != want {
+			t.Errorf("msgLen=%d: got %s, want %s", tt.msgLen, got, want)
+		}
+		// check that Sum is idempotent
+		got = fmt.Sprintf("%X", h.Sum(nil))
+		if got != want {
+			t.Errorf("msglen=%d: got %s, want %s", tt.msgLen, got, want)
+		}
 	}
 }
 
+var hashaTests = []struct {
+	msgLen    int
+	hexDigest string
+}{
+	{0, "AECD027026D0675F9DE7A8AD8CCF512DB64B1EDCF0B20C388A0C7CC617AAA2C4"},
+	{1, "5A55F0367763D334A3174F9C17FA476EB9196A22F10DAF29505633572E7756E4"},
+	{7, "6B6AD8A90EAB00DCCC182DF1CEC764E706461E76D303863728B8590B772E9082"},
+	{8, "BE9332E10AD16137322968BBEC1776BA3F4ECDC1183DB7DBE1AC98BD66FCE7B6"},
+	{15, "2CABC9FB4DF0C8EB2ED789EB28AC5D464762B1F98C176C370548496CA9229BAC"},
+	{16, "EA1CB73639BFA0C6DE4E60960F4F73510FE4481340F1D956A59E9DD2166F9A99"},
+	{100, "ABD438E75E0C435B3C63365037211E4A12D9B8ACBF54A43B281736E3ABF39485"},
+}
+
 func TestHasha(t *testing.T) {
-	h := NewHasha()
-	want := "AECD027026D0675F9DE7A8AD8CCF512DB64B1EDCF0B20C388A0C7CC617AAA2C4"
-	got := fmt.Sprintf("%X", h.Sum(nil))
-	if got != want {
-		t.Errorf("got %s, want %s", got, want)
-	}
-	// check that Sum is idempotent
-	got = fmt.Sprintf("%X", h.Sum(nil))
-	if got != want {
-		t.Errorf("got %s, want %s", got, want)
+	for _, tt := range hashaTests {
+		h := NewHasha()
+		msg := make([]byte, tt.msgLen)
+		for i := range msg {
+			msg[i] = byte(i)
+		}
+		h.Write(msg)
+		want := tt.hexDigest
+		got := fmt.Sprintf("%X", h.Sum(nil))
+		if got != want {
+			t.Errorf("msglen=%d: got %s, want %s", tt.msgLen, got, want)
+		}
+		// check that Sum is idempotent
+		got = fmt.Sprintf("%X", h.Sum(nil))
+		if got != want {
+			t.Errorf("msglen=%d: got %s, want %s", tt.msgLen, got, want)
+		}
 	}
 }
 
