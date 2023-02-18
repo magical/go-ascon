@@ -82,7 +82,9 @@ func benchMAC(b *testing.B, size int64) {
 	}
 }
 
-func BenchmarkMAC_8(b *testing.B)  { benchMAC(b, 8) }
-func BenchmarkMAC_64(b *testing.B) { benchMAC(b, 64) }
-func BenchmarkMAC_1k(b *testing.B) { benchMAC(b, 1024) }
-func BenchmarkMAC_8k(b *testing.B) { benchMAC(b, 8192) }
+func BenchmarkMAC(b *testing.B) {
+	b.Run("8", func(b *testing.B) { benchMAC(b, 8) })
+	b.Run("64", func(b *testing.B) { benchMAC(b, 64) })
+	b.Run("1k", func(b *testing.B) { benchMAC(b, 1024) })
+	b.Run("8k", func(b *testing.B) { benchMAC(b, 8192) })
+}

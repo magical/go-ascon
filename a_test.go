@@ -272,15 +272,19 @@ func benchHash(b *testing.B, f func() *Hash, size int64) {
 	}
 }
 
-func BenchmarkHash256_8(b *testing.B)  { benchHash(b, NewHash, 8) }
-func BenchmarkHash256_64(b *testing.B) { benchHash(b, NewHash, 64) }
-func BenchmarkHash256_1k(b *testing.B) { benchHash(b, NewHash, 1024) }
-func BenchmarkHash256_8k(b *testing.B) { benchHash(b, NewHash, 8192) }
+func BenchmarkHash(b *testing.B) {
+	b.Run("8", func(b *testing.B) { benchHash(b, NewHash, 8) })
+	b.Run("64", func(b *testing.B) { benchHash(b, NewHash, 64) })
+	b.Run("1k", func(b *testing.B) { benchHash(b, NewHash, 1024) })
+	b.Run("8k", func(b *testing.B) { benchHash(b, NewHash, 8192) })
+}
 
-func BenchmarkHasha256_8(b *testing.B)  { benchHash(b, NewHasha, 8) }
-func BenchmarkHasha256_64(b *testing.B) { benchHash(b, NewHasha, 64) }
-func BenchmarkHasha256_1k(b *testing.B) { benchHash(b, NewHasha, 1024) }
-func BenchmarkHasha256_8k(b *testing.B) { benchHash(b, NewHasha, 8192) }
+func BenchmarkHasha(b *testing.B) {
+	b.Run("8", func(b *testing.B) { benchHash(b, NewHasha, 8) })
+	b.Run("64", func(b *testing.B) { benchHash(b, NewHasha, 64) })
+	b.Run("1k", func(b *testing.B) { benchHash(b, NewHasha, 1024) })
+	b.Run("8k", func(b *testing.B) { benchHash(b, NewHasha, 8192) })
+}
 
 func benchSeal(b *testing.B, size int64) {
 	b.SetBytes(size)
@@ -294,10 +298,12 @@ func benchSeal(b *testing.B, size int64) {
 	}
 }
 
-func BenchmarkSeal_8(b *testing.B)  { benchSeal(b, 8) }
-func BenchmarkSeal_64(b *testing.B) { benchSeal(b, 64) }
-func BenchmarkSeal_1k(b *testing.B) { benchSeal(b, 1024) }
-func BenchmarkSeal_8k(b *testing.B) { benchSeal(b, 8192) }
+func BenchmarkSeal(b *testing.B) {
+	b.Run("8", func(b *testing.B) { benchSeal(b, 8) })
+	b.Run("64", func(b *testing.B) { benchSeal(b, 64) })
+	b.Run("1k", func(b *testing.B) { benchSeal(b, 1024) })
+	b.Run("8k", func(b *testing.B) { benchSeal(b, 8192) })
+}
 
 func benchOpen(b *testing.B, size int64) {
 	b.SetBytes(size)
@@ -314,10 +320,12 @@ func benchOpen(b *testing.B, size int64) {
 	}
 }
 
-func BenchmarkOpen_8(b *testing.B)  { benchOpen(b, 8) }
-func BenchmarkOpen_64(b *testing.B) { benchOpen(b, 64) }
-func BenchmarkOpen_1k(b *testing.B) { benchOpen(b, 1024) }
-func BenchmarkOpen_8k(b *testing.B) { benchOpen(b, 8192) }
+func BenchmarkOpen(b *testing.B) {
+	b.Run("8", func(b *testing.B) { benchOpen(b, 8) })
+	b.Run("64", func(b *testing.B) { benchOpen(b, 64) })
+	b.Run("1k", func(b *testing.B) { benchOpen(b, 1024) })
+	b.Run("8k", func(b *testing.B) { benchOpen(b, 8192) })
+}
 
 func benchRead(b *testing.B, size int64) {
 	b.SetBytes(size)
@@ -329,6 +337,8 @@ func benchRead(b *testing.B, size int64) {
 	}
 }
 
-func BenchmarkXofReadUnaligned(b *testing.B) { benchRead(b, 31) } // 31 is a Mersenne prime
-func BenchmarkXofReadAligned(b *testing.B)   { benchRead(b, 32) }
-func BenchmarkXofReadLarge(b *testing.B)     { benchRead(b, 16<<10) }
+func BenchmarkXofRead(b *testing.B) {
+	b.Run("Unaligned", func(b *testing.B) { benchRead(b, 31) }) // 31 is a Mersenne prime
+	b.Run("Aligned", func(b *testing.B) { benchRead(b, 32) })
+	b.Run("Large", func(b *testing.B) { benchRead(b, 16<<10) })
+}
