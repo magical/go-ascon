@@ -240,8 +240,7 @@ func TestAEAD(t *testing.T) {
 		//ad   = unhex("")
 		//want = "BC820DBDF7A4631C5B29884AD6917516D420A5BC2E5357D010818F0B5F7859"
 	)
-	a := new(AEAD)
-	copy(a.key[:], key)
+	a, _ := NewAEAD(key)
 	c := a.Seal(nil, nonce, text, ad)
 	got := fmt.Sprintf("%X", c)
 	if got != want {
@@ -281,8 +280,7 @@ func TestGenKatAEAD(t *testing.T) {
 			fmt.Fprintf(w, "Nonce = %X\n", nonce)
 			fmt.Fprintf(w, "PT = %X\n", msg)
 			fmt.Fprintf(w, "AD = %X\n", ad)
-			a := new(AEAD)
-			copy(a.key[:], key)
+			a, _ := NewAEAD(key)
 			c := a.Seal(nil, nonce, msg, ad)
 			fmt.Fprintf(w, "CT = %X\n", c)
 			fmt.Fprintln(w)
@@ -337,7 +335,11 @@ func benchSeal(b *testing.B, size int64) {
 	var nonce = make([]byte, NonceSize)
 	var dst = make([]byte, 0, size+TagSize)
 	var msg = make([]byte, size)
-	a := new(AEAD)
+	var key = make([]byte, KeySize)
+	a, err := NewAEAD(key)
+	if err != nil {
+		b.Fatal(err)
+	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		a.Seal(dst[:0], nonce, msg, nil)
@@ -355,7 +357,11 @@ func benchOpen(b *testing.B, size int64) {
 	b.SetBytes(size)
 	var nonce = make([]byte, NonceSize)
 	var msg = make([]byte, size)
-	a := new(AEAD)
+	var key = make([]byte, KeySize)
+	a, err := NewAEAD(key)
+	if err != nil {
+		b.Fatal(err)
+	}
 	ciphertext := a.Seal(nil, nonce, msg, nil)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
