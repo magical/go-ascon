@@ -18,3 +18,15 @@ func be64enc(b []byte, x uint64) {
 func be64append(b []byte, x uint64) []byte {
 	return append(b, byte(x>>56), byte(x>>48), byte(x>>40), byte(x>>32), byte(x>>24), byte(x>>16), byte(x>>8), byte(x))
 }
+
+func le64dec(b []byte) uint64 {
+	return binary.LittleEndian.Uint64(b)
+}
+
+func le64enc(b []byte, x uint64) {
+	binary.LittleEndian.PutUint64(b, x)
+}
+
+func le64append(b []byte, x uint64) []byte {
+	return append(b, byte(x), byte(x>>8), byte(x>>16), byte(x>>24), byte(x>>32), byte(x>>40), byte(x>>48), byte(x>>56))
+}
