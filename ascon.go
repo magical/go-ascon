@@ -11,10 +11,17 @@ import "math/bits"
 type state [5]uint64
 
 // Section 2.6.1, Table 4 (page 13)
-// p12 uses 0..12
-// p8 uses 4..12
-// p6 uses 6..12
-var roundConstant = [12]uint8{
+// p12 uses 4..16
+// p8 uses 8..16
+// p6 uses 10..16
+var roundConstant = [16]uint8{
+	// Extended round constants from NIST.SP.800-232
+	0x000000000000003c,
+	0x000000000000002d,
+	0x000000000000001e,
+	0x000000000000000f,
+
+	// Original constants
 	0x00000000000000f0,
 	0x00000000000000e1,
 	0x00000000000000d2,
@@ -37,7 +44,7 @@ func roundGeneric(s *state, numRounds uint) {
 	x3 = s[3]
 	x4 = s[4]
 
-	for _, r := range roundConstant[12-numRounds:] {
+	for _, r := range roundConstant[16-numRounds:] {
 		// Section 2.6.1, Addition of Constants (page 13)
 		x2 ^= uint64(r)
 
