@@ -17,36 +17,31 @@ type digest struct {
 	doneWriting bool
 }
 
-type Hash struct{ digest }
+// Hash256 provides an implementation of Ascon-Hash256 from NIST.SP.800-232.
+type Hash256 struct{ digest }
 
-func NewHash() *Hash {
-	h := new(Hash)
+func NewHash256() *Hash256 {
+	h := new(Hash256)
 	h.digest.reset(12)
 	return h
 }
 
-func NewHasha() *Hash {
-	h := new(Hash)
-	h.digest.reset(8)
-	return h
-}
-
 // The size of the final hash, in bytes.
-func (h *Hash) Size() int { return HashSize }
+func (h *Hash256) Size() int { return HashSize }
 
-func (h *Hash) Reset() { h.digest.reset(h.digest.b) }
+func (h *Hash256) Reset() { h.digest.reset(h.digest.b) }
 
 // Sum appends a message digest to [b] and returns the new slice.
 // Does not modify the hash state.
-func (h *Hash) Sum(b []byte) []byte { return h.digest.sum(b) }
+func (h *Hash256) Sum(b []byte) []byte { return h.digest.sum(b) }
 
 // Clone returns a new copy of h.
-func (h *Hash) Clone() *Hash {
+func (h *Hash256) Clone() *Hash256 {
 	new := *h
 	return &new
 }
 
-func (h *Hash) Write(p []byte) (int, error) {
+func (h *Hash256) Write(p []byte) (int, error) {
 	if h.digest.b == 0 {
 		h.Reset()
 	}
@@ -104,19 +99,19 @@ func (d *digest) reset(b uint8) {
 		b = 12
 		fallthrough
 	case 12:
-		d.s[0] = 0xee9398aadb67f03d
-		d.s[1] = 0x8bb21831c60f1002
-		d.s[2] = 0xb48a92db98d5da62
-		d.s[3] = 0x43189921b8f8e3e8
-		d.s[4] = 0x348fa5c9d525e140
+		d.s[0] = 0x9b1e5494e934d681
+		d.s[1] = 0x4bc3a01e333751d2
+		d.s[2] = 0xae65396c6b34b81a
+		d.s[3] = 0x3c7fd4a4d56a4db3
+		d.s[4] = 0x1a5c464906c5976d
 		d.b = b
-	case 8:
-		d.s[0] = 0x01470194fc6528a6
-		d.s[1] = 0x738ec38ac0adffa7
-		d.s[2] = 0x2ec8e3296c76384c
-		d.s[3] = 0xd6f6a54d7f52377d
-		d.s[4] = 0xa13c42a223be8d87
-		d.b = b
+	//case 8:
+	//	d.s[0] = 0x01470194fc6528a6
+	//	d.s[1] = 0x738ec38ac0adffa7
+	//	d.s[2] = 0x2ec8e3296c76384c
+	//	d.s[3] = 0xd6f6a54d7f52377d
+	//	d.s[4] = 0xa13c42a223be8d87
+	//	d.b = b
 	default:
 		d.initHash(BlockSize*8, 12, b, 256)
 	}
@@ -129,7 +124,8 @@ func (d *digest) reset(b uint8) {
 // Ascon-Xof:  l=256, hash=0,   datablock=64, a=12, b=12
 
 func (d *digest) initHash(blockSize, a, b uint8, h uint32) {
-	d.s[0] = uint64(blockSize)<<48 + uint64(a)<<40 + uint64(a-b)<<32 + uint64(h)
+	//d.s[0] = uint64(blockSize)<<48 + uint64(a)<<40 + uint64(a-b)<<32 + uint64(h)
+	d.s[0] = 2 + uint64(a)<<16 + uint64(b)<<20 + uint64(h)<<24 + uint64(blockSize/8)<<40
 	d.s[1] = 0
 	d.s[2] = 0
 	d.s[3] = 0
@@ -152,14 +148,14 @@ func (d *digest) write(b []byte) {
 		d.len += uint8(n)
 		b = b[n:]
 		if d.len == bs {
-			d.s[0] ^= be64dec(d.buf[0:])
+			d.s[0] ^= le64dec(d.buf[0:])
 			d.roundB()
 			d.len = 0
 		}
 	}
 	// absorb bytes directly, skipping the buffer
 	for len(b) >= bs {
-		d.s[0] ^= be64dec(b)
+		d.s[0] ^= le64dec(b)
 		d.roundB()
 		b = b[bs:]
 	}
@@ -177,19 +173,24 @@ func (d *digest) finish() {
 
 	// Pad with a 1 followed by zeroes
 	const bs = BlockSize
-	for i := d.len; i < bs; i++ {
+	for i := d.len + 1; i < bs; i++ {
 		d.buf[i] = 0
 	}
-	d.buf[d.len] |= 0x80
+	d.buf[d.len] = 1
 
 	// absorb the last block
-	d.s[0] ^= be64dec(d.buf[0:])
+	d.s[0] ^= le64dec(d.buf[0:])
 	d.roundA()
 	d.len = 0
 }
 
-func (d0 *digest) sum(b []byte) []byte {
-	d := *d0
+func (d *digest) clone() *digest {
+	d0 := *d
+	return &d0
+}
+
+func (d *digest) sum(b []byte) []byte {
+	d = d.clone()
 	d.finish()
 
 	// Squeeze
@@ -197,7 +198,7 @@ func (d0 *digest) sum(b []byte) []byte {
 		if i != 0 {
 			d.roundB()
 		}
-		b = be64append(b, d.s[0])
+		b = le64append(b, d.s[0])
 	}
 	return b
 }
@@ -236,12 +237,12 @@ func (d *digest) read(p []byte) {
 	// Copy whole blocks if we can
 	if len(p) >= 8 && d.len == 0 {
 		d.len = 8
-		be64enc(p, d.s[0])
+		le64enc(p, d.s[0])
 		p = p[8:]
 	}
 	for len(p) >= 8 {
 		d.roundB()
-		be64enc(p, d.s[0])
+		le64enc(p, d.s[0])
 		p = p[8:]
 	}
 
@@ -251,7 +252,7 @@ func (d *digest) read(p []byte) {
 		if d.len == 8 {
 			d.roundB()
 		}
-		be64enc(d.buf[:], d.s[0])
+		le64enc(d.buf[:], d.s[0])
 		n := copy(p, d.buf[:])
 		d.len = uint8(n)
 	}
@@ -275,6 +276,6 @@ func (d *digest) readAll(p []byte) {
 		if i != 0 {
 			d.roundB()
 		}
-		be64enc(p[i:], d.s[0])
+		le64enc(p[i:], d.s[0])
 	}
 }
