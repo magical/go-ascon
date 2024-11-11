@@ -308,13 +308,13 @@ func (d *digest) read(p []byte) {
 // Used for testing Read.
 func (d *digest) readAll(p []byte) {
 	if d.doneWriting {
-		panic("internal error")
+		panic("ascon: internal error")
 	}
 	d.finish()
 	d.doneWriting = true
 
 	if len(p)%BlockSize != 0 {
-		panic("internal error")
+		panic("ascon: internal error")
 	}
 
 	for i := 0; i < len(p); i += BlockSize {
