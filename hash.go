@@ -49,29 +49,29 @@ func (h *Hash256) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Xof is an implementation of the Ascon-Xof arbitrary-length hash algorithm.
+// Xof128 is an implementation of the Ascon-Xof128 arbitrary-length hash algorithm.
 // It implements the golang.org/x/crypto/sha3.ShakeHash interface (minus Clone).
-type Xof struct{ digest }
+type Xof128 struct{ digest }
 
-func NewXof() *Xof {
-	x := new(Xof)
+func NewXof128() *Xof128 {
+	x := new(Xof128)
 	x.Reset()
 	return x
 }
 
 // Clone returns a new copy of x.
-func (x *Xof) Clone() *Xof {
+func (x *Xof128) Clone() *Xof128 {
 	new := *x
 	return &new
 }
 
-func (x *Xof) Reset() {
-	x.digest.initHash(64, 12, 12, 0)
+func (x *Xof128) Reset() {
+	x.digest.initHash(3, 64, 12, 12, 0)
 	x.digest.len = 0
 	x.digest.doneWriting = false
 }
 
-func (x *Xof) Write(p []byte) (int, error) {
+func (x *Xof128) Write(p []byte) (int, error) {
 	if x.digest.b == 0 {
 		x.Reset()
 	}
@@ -79,7 +79,7 @@ func (x *Xof) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func (x *Xof) Read(p []byte) (int, error) {
+func (x *Xof128) Read(p []byte) (int, error) {
 	if x.digest.b == 0 {
 		x.Reset()
 	}
@@ -93,7 +93,7 @@ func (d *digest) BlockSize() int { return BlockSize }
 
 func (d *digest) reset(b uint8) {
 	//fmt.Println("resetting")
-	//d.initHash(BlockSize*8, 12, 12, Size*8)
+	//d.initHash(2, BlockSize*8, 12, 12, Size*8)
 	switch b {
 	case 0:
 		b = 12
@@ -113,19 +113,19 @@ func (d *digest) reset(b uint8) {
 	//	d.s[4] = 0xa13c42a223be8d87
 	//	d.b = b
 	default:
-		d.initHash(BlockSize*8, 12, b, 256)
+		d.initHash(2, BlockSize*8, 12, b, 256)
 	}
 	d.buf = [8]byte{}
 	d.len = 0
 	d.doneWriting = false
 }
 
-// Ascon-Hash: l=256, hash=256, datablock=64, a=12, b=12
-// Ascon-Xof:  l=256, hash=0,   datablock=64, a=12, b=12
+// Ascon-Hash: v=2, l=256, hash=256, datablock=64, a=12, b=12
+// Ascon-Xof:  v=3, l=256, hash=0,   datablock=64, a=12, b=12
 
-func (d *digest) initHash(blockSize, a, b uint8, h uint32) {
+func (d *digest) initHash(v, blockSize, a, b uint8, h uint32) {
 	//d.s[0] = uint64(blockSize)<<48 + uint64(a)<<40 + uint64(a-b)<<32 + uint64(h)
-	d.s[0] = 2 + uint64(a)<<16 + uint64(b)<<20 + uint64(h)<<24 + uint64(blockSize/8)<<40
+	d.s[0] = uint64(v) + uint64(a)<<16 + uint64(b)<<20 + uint64(h)<<24 + uint64(blockSize/8)<<40
 	d.s[1] = 0
 	d.s[2] = 0
 	d.s[3] = 0

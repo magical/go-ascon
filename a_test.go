@@ -20,7 +20,7 @@ func TestInit(t *testing.T) {
 	// Test that the hardcoded initial state equals the computed values
 	h := NewHash256()
 	g := new(Hash256)
-	g.initHash(64, 12, 12, 256)
+	g.initHash(2, 64, 12, 12, 256)
 	got := h.s
 	want := g.s
 	for i := range got {
@@ -32,7 +32,7 @@ func TestInit(t *testing.T) {
 	/**
 	h = NewHasha()
 	got = h.s
-	g.initHash(64, 12, 8, 256)
+	g.initHash(2, 64, 12, 8, 256)
 	want = g.s
 	for i := range got {
 		if got[i] != want[i] {
@@ -161,7 +161,7 @@ func TestGenKatXof(t *testing.T) {
 		}
 		fmt.Fprintf(w, "Count = %d\n", i+1)
 		fmt.Fprintf(w, "Msg = %X\n", b)
-		x := NewXof()
+		x := NewXof128()
 		x.Write(b)
 		x.Read(sum)
 		fmt.Fprintf(w, "MD = %X\n", sum)
@@ -170,7 +170,7 @@ func TestGenKatXof(t *testing.T) {
 }
 
 func TestXofChunks(t *testing.T) {
-	init := NewXof()
+	init := NewXof128()
 	init.Write([]byte("abc"))
 
 	const N = 2016
@@ -389,7 +389,7 @@ func BenchmarkOpen(b *testing.B) {
 func benchRead(b *testing.B, size int64) {
 	b.SetBytes(size)
 	var buf = make([]byte, size)
-	x := NewXof()
+	x := NewXof128()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		x.Read(buf)
