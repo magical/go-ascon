@@ -256,20 +256,6 @@ func (s *state) decryptLe(ciphertext, dst []byte, B uint) {
 		x |= 1 << (len(c) * 8) // Pad
 
 		s[si] ^= x
-
-		//if len(c) > 0 {
-		//	var buf [16]byte
-		//	n := copy(buf[:], c)
-		//	buf[n] = 1 // pad
-		//	x := le64dec(buf[:])
-		//	y := le64dec(buf[8:])
-		//	x ^= s[0]
-		//	y ^= s[1]
-		//	le64enc(buf[:], x)
-		//	le64enc(buf[8:], y)
-		//	s[0] ^= x
-		//	s[1] ^= y
-		//	copy(p, buf[:n])
 	} else {
 		// Pad
 		s[si] ^= 1
