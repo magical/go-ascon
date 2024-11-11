@@ -15,34 +15,40 @@ const (
 
 // TODO: Section 3.1 says: "The number of processed plaintext and associated data blocks protected by the encryption algorithm is limited to a total of 2^64 blocks per key, which corresponds to 2^67 bytes (for Ascon-128, Ascon-80pq) or 2^68 bytes (for Ascon-128a)."
 
-// AEAD provides an implementation of Ascon-128.
+// The differences from the original specification of Ascon are
+// * bytes are little-endian instead of big endian
+// * new initial values (instead of zero)
+// * the rate is doubled
+// * increased number of rounds
+
+// AEAD128 provides an implementation of Ascon-AEAD128 from NIST.SP.800-232.
 // It implements the crypto/cipher.AEAD interface.
-type AEAD struct {
+type AEAD128 struct {
 	// TODO: k0, k1 uint64?
 	key [16]byte
 }
 
-func NewAEAD(key []byte) (*AEAD, error) {
-	a := new(AEAD)
+func NewAEAD128(key []byte) (*AEAD128, error) {
+	a := new(AEAD128)
 	a.SetKey(key)
 	return a, nil
 }
 
 // Sets the key to a new value.
 // This method is not safe for concurrent use with other methods.
-func (a *AEAD) SetKey(key []byte) {
+func (a *AEAD128) SetKey(key []byte) {
 	if len(key) != KeySize {
 		panic("ascon: wrong key size")
 	}
 	copy(a.key[:], key)
 }
 
-func (*AEAD) NonceSize() int { return NonceSize }
-func (*AEAD) Overhead() int  { return TagSize }
+func (*AEAD128) NonceSize() int { return NonceSize }
+func (*AEAD128) Overhead() int  { return TagSize }
 
 // Seal encrypts and authenticates a plaintext
 // and appends ciphertext to dst, returning the appended slice.
-func (a *AEAD) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
+func (a *AEAD128) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 	if len(nonce) != NonceSize {
 		panic(fmt.Sprintf("ascon: bad nonce (len %d)", len(nonce)))
 	}
@@ -50,20 +56,20 @@ func (a *AEAD) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 	// Initialize
 	// IV || key || nonce
 	var s state
-	const A, B uint = 12, 6
-	s.initAEAD(a.key[:], 64, uint8(A), uint8(B), nonce)
+	const A, B uint = 12, 8
+	s.initAEADle(a.key[:], 128, uint8(A), uint8(B), nonce)
 	//log.Printf("%x\n", &s)
 
 	// mix the key in again
-	k0 := be64dec(a.key[0:])
-	k1 := be64dec(a.key[8:])
+	k0 := le64dec(a.key[0:])
+	k1 := le64dec(a.key[8:])
 	s[3] ^= k0
 	s[4] ^= k1
 
 	// Absorb additionalData
 	s.mixAdditionalData(additionalData, B)
 	// domain-separation constant
-	s[4] ^= 1
+	s[4] ^= 0x80 << 56
 
 	// allocate space
 	dstLen := len(dst)
@@ -73,8 +79,8 @@ func (a *AEAD) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 	c := s.encrypt(plaintext, dst[dstLen:], B)
 
 	// mix the key in again
-	s[1] ^= k0
-	s[2] ^= k1
+	s[2] ^= k0
+	s[3] ^= k1
 
 	// Finalize
 	s.rounds(A)
@@ -82,21 +88,21 @@ func (a *AEAD) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 	// Append tag
 	t0 := s[3] ^ k0
 	t1 := s[4] ^ k1
-	be64enc(c[0:], t0)
-	be64enc(c[8:], t1)
+	le64enc(c[0:], t0)
+	le64enc(c[8:], t1)
 
 	return dst
 }
 
-func (s *state) initAEAD(key []byte, blockSize, A, B uint8, nonce []byte) {
+func (s *state) initAEADle(key []byte, blockSize, A, B uint8, nonce []byte) {
 	if len(key) != KeySize {
 		panic("invalid key length")
 	}
-	s[0] = uint64(byte(len(key)*8))<<56 + uint64(blockSize)<<48 + uint64(A)<<40 + uint64(A-B)<<32
-	s[1] = be64dec(key[0:])
-	s[2] = be64dec(key[8:])
-	s[3] = be64dec(nonce[0:])
-	s[4] = be64dec(nonce[8:])
+	s[0] = 1 + uint64(A)<<16 + uint64(B)<<20 + uint64(byte(len(key)*8))<<24 + uint64(blockSize/8)<<40
+	s[1] = le64dec(key[0:])
+	s[2] = le64dec(key[8:])
+	s[3] = le64dec(nonce[0:])
+	s[4] = le64dec(nonce[8:])
 	//log.Printf("%x\n", &s)
 	s.rounds(uint(A))
 }
@@ -109,23 +115,24 @@ func (s *state) mixAdditionalData(additionalData []byte, B uint) {
 		return
 	}
 
-	for len(ad) >= 8 {
-		s[0] ^= be64dec(ad)
-		ad = ad[8:]
+	for len(ad) >= 16 {
+		s[0] ^= le64dec(ad)
+		s[1] ^= le64dec(ad[8:])
+		ad = ad[16:]
 		s.rounds(B)
 	}
 
 	// last chunk
 	if len(ad) > 0 {
-		var buf [8]byte
+		var buf [16]byte
 		n := copy(buf[:], ad)
-		// Pad
-		buf[n] |= 0x80
-		s[0] ^= be64dec(buf[:])
+		buf[n] = 1 // Pad
+		s[0] ^= le64dec(buf[:])
+		s[1] ^= le64dec(buf[8:])
 		s.rounds(B)
 	} else {
 		// Pad
-		s[0] ^= 0x80 << 56
+		s[0] ^= 1
 		s.rounds(B)
 	}
 }
@@ -133,27 +140,30 @@ func (s *state) mixAdditionalData(additionalData []byte, B uint) {
 func (s *state) encrypt(plaintext, dst []byte, B uint) []byte {
 	p := plaintext
 	c := dst
-	for len(p) >= 8 {
-		s[0] ^= be64dec(p)
-		be64enc(c, s[0])
-		p = p[8:]
-		c = c[8:]
+	for len(p) >= 16 {
+		s[0] ^= le64dec(p)
+		s[1] ^= le64dec(p[8:])
+		le64enc(c[0:], s[0])
+		le64enc(c[8:], s[1])
+		p = p[16:]
+		c = c[16:]
 		s.rounds(B)
 	}
 	if len(p) > 0 {
-		var buf [8]byte
+		var buf [16]byte
 		n := copy(buf[:], p)
-		// Pad
-		buf[n] |= 0x80
-		s[0] ^= be64dec(buf[:])
-		// may write up to 7 too many bytes
+		buf[n] = 1 // Pad
+		s[0] ^= le64dec(buf[:])
+		s[1] ^= le64dec(buf[8:])
+		// may write up to 15 too many bytes
 		// but it's okay because we have space reserved
 		// for the tag
-		be64enc(c, s[0])
+		le64enc(c, s[0])
+		le64enc(c[8:], s[1])
 		c = c[n:]
 	} else {
 		// Pad
-		s[0] ^= 0x80 << 56
+		s[0] ^= 1
 	}
 	// note: no round is done after the final plaintext block
 	return c
@@ -161,7 +171,7 @@ func (s *state) encrypt(plaintext, dst []byte, B uint) []byte {
 
 var fail = errors.New("ascon: decryption failed")
 
-func (a *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, error) {
+func (a *AEAD128) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, error) {
 	if len(nonce) != NonceSize {
 		panic(fmt.Sprintf("ascon: bad nonce (len %d)", len(nonce)))
 		// return fail?
@@ -180,27 +190,27 @@ func (a *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, erro
 	// Initialize
 	// IV || key || nonce
 	var s state
-	const A, B uint = 12, 6
-	s.initAEAD(a.key[:], 64, uint8(A), uint8(B), nonce)
+	const A, B uint = 12, 8
+	s.initAEADle(a.key[:], 128, uint8(A), uint8(B), nonce)
 	//log.Printf("%x\n", &s)
 
 	// mix the key in again
-	k0 := be64dec(a.key[0:])
-	k1 := be64dec(a.key[8:])
+	k0 := le64dec(a.key[0:])
+	k1 := le64dec(a.key[8:])
 	s[3] ^= k0
 	s[4] ^= k1
 
 	// Absorb additionalData
 	s.mixAdditionalData(additionalData, B)
 	// domain-separation constant
-	s[4] ^= 1
+	s[4] ^= 0x80 << 56
 
 	// Duplex plaintext/ciphertext
 	s.decrypt(ciphertext, dst[dstLen:], B)
 
 	// mix the key in again
-	s[1] ^= k0
-	s[2] ^= k1
+	s[2] ^= k0
+	s[3] ^= k1
 
 	// Finalize
 	s.rounds(A)
@@ -209,8 +219,8 @@ func (a *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, erro
 	t0 := s[3] ^ k0
 	t1 := s[4] ^ k1
 	// Check tag in constant time
-	t0 ^= be64dec(expectedTag[0:])
-	t1 ^= be64dec(expectedTag[8:])
+	t0 ^= le64dec(expectedTag[0:])
+	t1 ^= le64dec(expectedTag[8:])
 	t := uint32(t0>>32) | uint32(t0)
 	t |= uint32(t1>>32) | uint32(t1)
 	if subtle.ConstantTimeEq(int32(t), 0) == 0 {
@@ -226,29 +236,41 @@ func (a *AEAD) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte, erro
 func (s *state) decrypt(ciphertext, dst []byte, B uint) {
 	c := ciphertext
 	p := dst
-	for len(c) >= 8 {
-		x := be64dec(c)
-		be64enc(p, x^s[0])
+	for len(c) >= 16 {
+		x := le64dec(c)
+		y := le64dec(c[8:])
+		le64enc(p[0:], x^s[0])
+		le64enc(p[8:], y^s[1])
+		s[0] = x
+		s[1] = y
+		p = p[16:]
+		c = c[16:]
+		s.rounds(B)
+	}
+	si := 0
+	if len(c) >= 8 {
+		x := le64dec(c)
+		le64enc(p, x^s[0])
 		s[0] = x
 		p = p[8:]
 		c = c[8:]
-		s.rounds(B)
+		si = 1
 	}
 	if len(c) > 0 {
 		for i := range p {
-			p[i] = c[i] ^ byte(s[0]>>(56-i*8))
+			p[i] = c[i] ^ byte(s[si]>>(i*8))
 		}
 
 		var x uint64
 		for i := range p {
-			x |= uint64(p[i]) << (56 - i*8)
+			x |= uint64(p[i]) << (i * 8)
 		}
-		x |= 0x80 << (56 - (len(c) * 8)) // Pad
+		x |= 1 << (len(c) * 8) // Pad
 
-		s[0] ^= x
+		s[si] ^= x
 	} else {
 		// Pad
-		s[0] ^= 0x80 << 56
+		s[si] ^= 1
 	}
 	// note: no round is done after the final plaintext block
 }

@@ -218,7 +218,7 @@ func unhex(s string) []byte {
 	return b
 }
 
-var _ cipher.AEAD = (*AEAD)(nil)
+var _ cipher.AEAD = (*AEAD128)(nil)
 
 func TestAEAD(t *testing.T) {
 	//Count = 514
@@ -236,11 +236,11 @@ func TestAEAD(t *testing.T) {
 		nonce = key
 		text  = unhex("000102030405060708090A0B0C0D0E")
 		ad    = unhex("000102030405060708090A0B0C0D0E0F1011")
-		want  = "77AA511159627C4B855E67F95B3ABFA1FA8B51439743E4C8B41E4E76B40460"
+		want  = "501DFE330EC4528E8D3BC467A02391946E05C9402166B0CFB2E25844EA1277"
 		//ad   = unhex("")
 		//want = "BC820DBDF7A4631C5B29884AD6917516D420A5BC2E5357D010818F0B5F7859"
 	)
-	a, _ := NewAEAD(key)
+	a, _ := NewAEAD128(key)
 	c := a.Seal(nil, nonce, text, ad)
 	got := fmt.Sprintf("%X", c)
 	if got != want {
@@ -248,11 +248,11 @@ func TestAEAD(t *testing.T) {
 	}
 }
 
-func TestGenKatAEAD(t *testing.T) {
+func TestGenKatAEAD128(t *testing.T) {
 	if !*genkat {
 		t.Skip("skipping without -genkat flag")
 	}
-	f, err := os.Create("ascon_aead_kat.txt")
+	f, err := os.Create("ascon_aead_128_kat.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,11 +280,10 @@ func TestGenKatAEAD(t *testing.T) {
 			fmt.Fprintf(w, "Nonce = %X\n", nonce)
 			fmt.Fprintf(w, "PT = %X\n", msg)
 			fmt.Fprintf(w, "AD = %X\n", ad)
-			a, _ := NewAEAD(key)
+			a, _ := NewAEAD128(key)
 			c := a.Seal(nil, nonce, msg, ad)
 			fmt.Fprintf(w, "CT = %X\n", c)
 			fmt.Fprintln(w)
-			num += 1
 
 			// TODO: do these tests even without -genkat
 			if d, err := a.Open(nil, nonce, c, ad); err != nil {
@@ -297,6 +296,8 @@ func TestGenKatAEAD(t *testing.T) {
 			if _, err := a.Open(nil, nonce, c, ad); err == nil {
 				t.Errorf("decryption succeeded unexpectedly (Count = %d)", num)
 			}
+
+			num += 1
 		}
 	}
 }
@@ -336,7 +337,7 @@ func benchSeal(b *testing.B, size int64) {
 	var dst = make([]byte, 0, size+TagSize)
 	var msg = make([]byte, size)
 	var key = make([]byte, KeySize)
-	a, err := NewAEAD(key)
+	a, err := NewAEAD128(key)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -358,7 +359,7 @@ func benchOpen(b *testing.B, size int64) {
 	var nonce = make([]byte, NonceSize)
 	var msg = make([]byte, size)
 	var key = make([]byte, KeySize)
-	a, err := NewAEAD(key)
+	a, err := NewAEAD128(key)
 	if err != nil {
 		b.Fatal(err)
 	}
