@@ -51,7 +51,7 @@ func (h *Hash256) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Xof128 is an implementation of the Ascon-Xof128 arbitrary-length hash algorithm.
+// Xof128 is an implementation of the Ascon-XOF128 arbitrary-length hash algorithm.
 // It implements the golang.org/x/crypto/sha3.ShakeHash interface (minus Clone).
 type Xof128 struct{ digest }
 
