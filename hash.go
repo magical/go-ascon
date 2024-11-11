@@ -12,8 +12,8 @@ type digest struct {
 	s   state
 	buf [8]byte
 	len uint8 // number of bytes in buf
-	b   uint8 // number of rounds for the pB round function
 
+	initialized bool
 	doneWriting bool
 }
 
@@ -22,14 +22,14 @@ type Hash256 struct{ digest }
 
 func NewHash256() *Hash256 {
 	h := new(Hash256)
-	h.digest.reset(12)
+	h.digest.reset()
 	return h
 }
 
 // The size of the final hash, in bytes.
 func (h *Hash256) Size() int { return HashSize }
 
-func (h *Hash256) Reset() { h.digest.reset(h.digest.b) }
+func (h *Hash256) Reset() { h.digest.reset() }
 
 // Sum appends a message digest to [b] and returns the new slice.
 // Does not modify the hash state.
@@ -42,7 +42,7 @@ func (h *Hash256) Clone() *Hash256 {
 }
 
 func (h *Hash256) Write(p []byte) (int, error) {
-	if h.digest.b == 0 {
+	if h.digest.initialized == false {
 		h.Reset()
 	}
 	h.digest.write(p)
@@ -68,11 +68,12 @@ func (x *Xof128) Clone() *Xof128 {
 func (x *Xof128) Reset() {
 	x.digest.initHash(3, 64, 12, 12, 0)
 	x.digest.len = 0
+	x.digest.initialized = true
 	x.digest.doneWriting = false
 }
 
 func (x *Xof128) Write(p []byte) (int, error) {
-	if x.digest.b == 0 {
+	if x.digest.initialized == false {
 		x.Reset()
 	}
 	x.digest.write(p)
@@ -80,7 +81,7 @@ func (x *Xof128) Write(p []byte) (int, error) {
 }
 
 func (x *Xof128) Read(p []byte) (int, error) {
-	if x.digest.b == 0 {
+	if x.digest.initialized == false {
 		x.Reset()
 	}
 	x.digest.read(p)
@@ -91,32 +92,17 @@ func (x *Xof128) Read(p []byte) (int, error) {
 // Writes which are a multiple of BlockSize will be more performant.
 func (d *digest) BlockSize() int { return BlockSize }
 
-func (d *digest) reset(b uint8) {
+func (d *digest) reset() {
 	//fmt.Println("resetting")
-	//d.initHash(2, BlockSize*8, 12, 12, Size*8)
-	switch b {
-	case 0:
-		b = 12
-		fallthrough
-	case 12:
-		d.s[0] = 0x9b1e5494e934d681
-		d.s[1] = 0x4bc3a01e333751d2
-		d.s[2] = 0xae65396c6b34b81a
-		d.s[3] = 0x3c7fd4a4d56a4db3
-		d.s[4] = 0x1a5c464906c5976d
-		d.b = b
-	//case 8:
-	//	d.s[0] = 0x01470194fc6528a6
-	//	d.s[1] = 0x738ec38ac0adffa7
-	//	d.s[2] = 0x2ec8e3296c76384c
-	//	d.s[3] = 0xd6f6a54d7f52377d
-	//	d.s[4] = 0xa13c42a223be8d87
-	//	d.b = b
-	default:
-		d.initHash(2, BlockSize*8, 12, b, 256)
-	}
+	//d.initHash(2, BlockSize*8, 12, 12, 256)
+	d.s[0] = 0x9b1e5494e934d681
+	d.s[1] = 0x4bc3a01e333751d2
+	d.s[2] = 0xae65396c6b34b81a
+	d.s[3] = 0x3c7fd4a4d56a4db3
+	d.s[4] = 0x1a5c464906c5976d
 	d.buf = [8]byte{}
 	d.len = 0
+	d.initialized = true
 	d.doneWriting = false
 }
 
@@ -130,12 +116,11 @@ func (d *digest) initHash(v, blockSize, a, b uint8, h uint32) {
 	d.s[2] = 0
 	d.s[3] = 0
 	d.s[4] = 0
-	d.b = b
 	d.roundA()
 }
 
 func (d *digest) roundA() { roundGeneric(&d.s, 12) }
-func (d *digest) roundB() { roundGeneric(&d.s, uint(d.b)) }
+func (d *digest) roundB() { roundGeneric(&d.s, 12) }
 
 func (d *digest) write(b []byte) {
 	if d.doneWriting {
