@@ -3,6 +3,8 @@
 
 package ascon
 
+import "errors"
+
 const HashSize = 256 / 8  // bytes
 const BlockSize = 64 / 8  // bytes
 const stateSize = 320 / 8 // bytes
@@ -88,6 +90,65 @@ func (x *Xof128) Read(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// Cxof128 is an implementation of the Ascon-CXOF128 customized arbitrary-length hash algorithm.
+// It implements the golang.org/x/crypto/sha3.ShakeHash interface (minus Clone).
+type Cxof128 struct {
+	digest       digest
+	initialState *state
+}
+
+func NewCxof128(customizationString string) (*Cxof128, error) {
+	// "The length of the customization string shall be at most 2048 bits (i.e., 256 bytes)."
+	if len(customizationString) > 256 {
+		return nil, errors.New("ascon: customization string too long")
+	}
+	x := new(Cxof128)
+	x.digest.initHash(4, 64, 12, 12, 0)
+	// absorb Z_0, the length of the customization string (in bits) encoded as a uint64
+	x.digest.s[0] ^= uint64(len(customizationString)) * 8
+	x.digest.permute()
+	// absorb the customization string
+	x.digest.write([]byte(customizationString))
+	x.digest.finish() // flush buffer and pad
+	// save the initial state
+	s := x.digest.s // make a copy
+	x.initialState = &s
+	x.digest.initialized = true
+	return x, nil
+}
+
+// Clone returns a new copy of x.
+func (x *Cxof128) Clone() *Cxof128 {
+	new := *x
+	return &new
+}
+
+func (x *Cxof128) Reset() {
+	if x.digest.initialized == false {
+		panic("ascon: reset of uninitialized CXOF")
+	}
+	x.digest.s = *x.initialState
+	x.digest.len = 0
+	x.digest.initialized = true
+	x.digest.doneWriting = false
+}
+
+func (x *Cxof128) Write(p []byte) (int, error) {
+	if x.digest.initialized == false {
+		panic("ascon: write to uninitialized CXOF")
+	}
+	x.digest.write(p)
+	return len(p), nil
+}
+
+func (x *Cxof128) Read(p []byte) (int, error) {
+	if x.digest.initialized == false {
+		panic("ascon: read from uninitialized CXOF")
+	}
+	x.digest.read(p)
+	return len(p), nil
+}
+
 // The data rate of the sponge, in bytes.
 // Writes which are a multiple of BlockSize will be more performant.
 func (d *digest) BlockSize() int { return BlockSize }
@@ -116,11 +177,10 @@ func (d *digest) initHash(v, blockSize, a, b uint8, h uint32) {
 	d.s[2] = 0
 	d.s[3] = 0
 	d.s[4] = 0
-	d.roundA()
+	d.permute()
 }
 
-func (d *digest) roundA() { roundGeneric(&d.s, 12) }
-func (d *digest) roundB() { roundGeneric(&d.s, 12) }
+func (d *digest) permute() { roundGeneric(&d.s, 12) }
 
 func (d *digest) write(b []byte) {
 	if d.doneWriting {
@@ -134,14 +194,14 @@ func (d *digest) write(b []byte) {
 		b = b[n:]
 		if d.len == bs {
 			d.s[0] ^= le64dec(d.buf[0:])
-			d.roundB()
+			d.permute()
 			d.len = 0
 		}
 	}
 	// absorb bytes directly, skipping the buffer
 	for len(b) >= bs {
 		d.s[0] ^= le64dec(b)
-		d.roundB()
+		d.permute()
 		b = b[bs:]
 	}
 	// store any remaining bytes in the buffer
@@ -165,7 +225,7 @@ func (d *digest) finish() {
 
 	// absorb the last block
 	d.s[0] ^= le64dec(d.buf[0:])
-	d.roundA()
+	d.permute()
 	d.len = 0
 }
 
@@ -181,7 +241,7 @@ func (d *digest) sum(b []byte) []byte {
 	// Squeeze
 	for i := 0; i < HashSize/8; i++ {
 		if i != 0 {
-			d.roundB()
+			d.permute()
 		}
 		b = le64append(b, d.s[0])
 	}
@@ -201,8 +261,8 @@ func (d *digest) read(p []byte) {
 	// Squeeze
 
 	// invariants:
-	//  if d.len == 8 then the buffer is empty and roundB has NOT been called since the previous block
-	//  if d.len == 0 then the buffer is empty and roundB HAS been called since the previous block, or this is the first block
+	//  if d.len == 8 then the buffer is empty and permute has NOT been called since the previous block
+	//  if d.len == 0 then the buffer is empty and permute HAS been called since the previous block, or this is the first block
 	//  if 0 < d.len < 8 then we have bytes to read in d.buf
 
 	// Copy out any leftover bytes from the previous block
@@ -226,7 +286,7 @@ func (d *digest) read(p []byte) {
 		p = p[8:]
 	}
 	for len(p) >= 8 {
-		d.roundB()
+		d.permute()
 		le64enc(p, d.s[0])
 		p = p[8:]
 	}
@@ -235,7 +295,7 @@ func (d *digest) read(p []byte) {
 	if len(p) > 0 {
 		// fill the buffer
 		if d.len == 8 {
-			d.roundB()
+			d.permute()
 		}
 		le64enc(d.buf[:], d.s[0])
 		n := copy(p, d.buf[:])
@@ -259,7 +319,7 @@ func (d *digest) readAll(p []byte) {
 
 	for i := 0; i < len(p); i += BlockSize {
 		if i != 0 {
-			d.roundB()
+			d.permute()
 		}
 		le64enc(p[i:], d.s[0])
 	}
