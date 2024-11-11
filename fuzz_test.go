@@ -10,12 +10,6 @@ import (
 	"testing"
 )
 
-func newAEAD(key []byte) *AEAD {
-	a := new(AEAD)
-	copy(a.key[:], key)
-	return a
-}
-
 func FuzzAEAD(f *testing.F) {
 	key := []byte("my special key..")
 	nonce := []byte("my special nonce")
@@ -26,7 +20,7 @@ func FuzzAEAD(f *testing.F) {
 		msgLen, adLen int,
 		noise byte, noiseIndex int,
 	) {
-		a := newAEAD(key)
+		a, _ := NewAEAD128(key)
 		if msgLen < 0 || msgLen > 0x4000 {
 			return
 		}
