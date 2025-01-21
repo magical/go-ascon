@@ -263,7 +263,7 @@ func TestGenKatAEAD128(t *testing.T) {
 	defer f.Close()
 	w := bufio.NewWriter(f)
 	defer w.Flush()
-	num := 1
+	num := 0
 
 	mk := func(n int) []byte {
 		b := make([]byte, n)
@@ -274,6 +274,7 @@ func TestGenKatAEAD128(t *testing.T) {
 	}
 	for i := 0; i <= 32; i++ {
 		for j := 0; j <= 32; j++ {
+			num += 1
 			key := mk(16)
 			nonce := mk(16)
 			msg := mk(i)
@@ -300,8 +301,6 @@ func TestGenKatAEAD128(t *testing.T) {
 			if _, err := a.Open(nil, nonce, c, ad); err == nil {
 				t.Errorf("decryption succeeded unexpectedly (Count = %d)", num)
 			}
-
-			num += 1
 		}
 	}
 }
