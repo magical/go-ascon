@@ -222,6 +222,59 @@ func unhex(s string) []byte {
 	return b
 }
 
+func TestGenKatCxofUnofficial(t *testing.T) {
+	// Note (2025-01-20): There are no official KATs for Ascon-CXOF128
+	// so this is just an arbitrary set of test vectors of my choosing
+	if !*genkat {
+		t.Skip("skipping without -genkat flag")
+	}
+	f, err := os.Create("ascon_cxof_128_kat.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	w := bufio.NewWriter(f)
+	defer w.Flush()
+	sum := make([]byte, 32)
+	sum2 := make([]byte, 32)
+	mk := func(n int) []byte {
+		b := make([]byte, n)
+		for i := range b {
+			b[i] = byte(i % 256)
+		}
+		return b
+	}
+	num := 0
+	for i := 0; i <= 32; i++ {
+		for j := 0; j <= 32; j++ {
+			num++
+			custom := mk(i)
+			b := mk(j)
+			fmt.Fprintf(w, "Count = %d\n", num)
+			fmt.Fprintf(w, "Custom = %X\n", custom)
+			fmt.Fprintf(w, "Msg = %X\n", b)
+			x, err := NewCxof128(string(custom))
+			if err != nil {
+				fmt.Fprintf(w, "Error = %q", err)
+				t.Errorf("got error (Count = %d): %v", num, err)
+				continue
+			}
+			x.Write(b)
+			x.Read(sum)
+			fmt.Fprintf(w, "MD = %X\n", sum)
+			fmt.Fprintln(w)
+
+			// Test reset
+			x.Reset()
+			x.Write(b)
+			x.Read(sum2)
+			if !bytes.Equal(sum, sum2) {
+				t.Errorf("got different hash after reset (Count = %d):\n\t%X\n\t%X", num, sum, sum2)
+			}
+		}
+	}
+}
+
 var _ cipher.AEAD = (*AEAD128)(nil)
 
 func TestAEAD(t *testing.T) {
