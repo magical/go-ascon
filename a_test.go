@@ -153,7 +153,7 @@ func TestGenKatXof(t *testing.T) {
 	defer f.Close()
 	w := bufio.NewWriter(f)
 	defer w.Flush()
-	sum := make([]byte, 32)
+	sum := make([]byte, 64)
 	for i := 0; i <= 1024; i++ {
 		b := make([]byte, i)
 		for j := range b {
@@ -222,9 +222,7 @@ func unhex(s string) []byte {
 	return b
 }
 
-func TestGenKatCxofUnofficial(t *testing.T) {
-	// Note (2025-01-20): There are no official KATs for Ascon-CXOF128
-	// so this is just an arbitrary set of test vectors of my choosing
+func TestGenKatCxof(t *testing.T) {
 	if !*genkat {
 		t.Skip("skipping without -genkat flag")
 	}
@@ -235,12 +233,12 @@ func TestGenKatCxofUnofficial(t *testing.T) {
 	defer f.Close()
 	w := bufio.NewWriter(f)
 	defer w.Flush()
-	sum := make([]byte, 32)
-	sum2 := make([]byte, 32)
-	mk := func(n int) []byte {
+	sum := make([]byte, 64)
+	sum2 := make([]byte, 64)
+	mk := func(n int, base byte) []byte {
 		b := make([]byte, n)
 		for i := range b {
-			b[i] = byte(i % 256)
+			b[i] = base + byte(i%256)
 		}
 		return b
 	}
@@ -248,25 +246,25 @@ func TestGenKatCxofUnofficial(t *testing.T) {
 	for i := 0; i <= 32; i++ {
 		for j := 0; j <= 32; j++ {
 			num++
-			custom := mk(i)
-			b := mk(j)
+			msg := mk(i, 0x00)
+			custom := mk(j, 0x10)
 			fmt.Fprintf(w, "Count = %d\n", num)
-			fmt.Fprintf(w, "Custom = %X\n", custom)
-			fmt.Fprintf(w, "Msg = %X\n", b)
+			fmt.Fprintf(w, "Msg = %X\n", msg)
+			fmt.Fprintf(w, "Z = %X\n", custom)
 			x, err := NewCxof128(string(custom))
 			if err != nil {
 				fmt.Fprintf(w, "Error = %q", err)
 				t.Errorf("got error (Count = %d): %v", num, err)
 				continue
 			}
-			x.Write(b)
+			x.Write(msg)
 			x.Read(sum)
 			fmt.Fprintf(w, "MD = %X\n", sum)
 			fmt.Fprintln(w)
 
 			// Test reset
 			x.Reset()
-			x.Write(b)
+			x.Write(msg)
 			x.Read(sum2)
 			if !bytes.Equal(sum, sum2) {
 				t.Errorf("got different hash after reset (Count = %d):\n\t%X\n\t%X", num, sum, sum2)
@@ -318,20 +316,20 @@ func TestGenKatAEAD128(t *testing.T) {
 	defer w.Flush()
 	num := 0
 
-	mk := func(n int) []byte {
+	mk := func(n int, base byte) []byte {
 		b := make([]byte, n)
 		for i := range b {
-			b[i] = byte(i % 256)
+			b[i] = base + byte(i%256)
 		}
 		return b
 	}
 	for i := 0; i <= 32; i++ {
 		for j := 0; j <= 32; j++ {
 			num += 1
-			key := mk(16)
-			nonce := mk(16)
-			msg := mk(i)
-			ad := mk(j)
+			key := mk(16, 0x00)
+			nonce := mk(16, 0x10)
+			msg := mk(i, 0x20)
+			ad := mk(j, 0x30)
 
 			fmt.Fprintf(w, "Count = %d\n", num)
 			fmt.Fprintf(w, "Key = %X\n", key)
