@@ -3,6 +3,8 @@
 
 package ascon
 
+import "errors"
+
 const HashSize = 256 / 8  // bytes
 const BlockSize = 64 / 8  // bytes
 const stateSize = 320 / 8 // bytes
@@ -12,81 +14,136 @@ type digest struct {
 	s   state
 	buf [8]byte
 	len uint8 // number of bytes in buf
-	b   uint8 // number of rounds for the pB round function
 
+	initialized bool
 	doneWriting bool
 }
 
-type Hash struct{ digest }
+// Hash256 provides an implementation of Ascon-Hash256 from NIST.SP.800-232.
+type Hash256 struct{ digest }
 
-func NewHash() *Hash {
-	h := new(Hash)
-	h.digest.reset(12)
-	return h
-}
-
-func NewHasha() *Hash {
-	h := new(Hash)
-	h.digest.reset(8)
+func NewHash256() *Hash256 {
+	h := new(Hash256)
+	h.digest.reset()
 	return h
 }
 
 // The size of the final hash, in bytes.
-func (h *Hash) Size() int { return HashSize }
+func (h *Hash256) Size() int { return HashSize }
 
-func (h *Hash) Reset() { h.digest.reset(h.digest.b) }
+func (h *Hash256) Reset() { h.digest.reset() }
 
 // Sum appends a message digest to [b] and returns the new slice.
 // Does not modify the hash state.
-func (h *Hash) Sum(b []byte) []byte { return h.digest.sum(b) }
+func (h *Hash256) Sum(b []byte) []byte { return h.digest.sum(b) }
 
 // Clone returns a new copy of h.
-func (h *Hash) Clone() *Hash {
+func (h *Hash256) Clone() *Hash256 {
 	new := *h
 	return &new
 }
 
-func (h *Hash) Write(p []byte) (int, error) {
-	if h.digest.b == 0 {
+func (h *Hash256) Write(p []byte) (int, error) {
+	if h.digest.initialized == false {
 		h.Reset()
 	}
 	h.digest.write(p)
 	return len(p), nil
 }
 
-// Xof is an implementation of the Ascon-Xof arbitrary-length hash algorithm.
+// Xof128 is an implementation of the Ascon-XOF128 arbitrary-length hash algorithm.
 // It implements the golang.org/x/crypto/sha3.ShakeHash interface (minus Clone).
-type Xof struct{ digest }
+type Xof128 struct{ digest }
 
-func NewXof() *Xof {
-	x := new(Xof)
+func NewXof128() *Xof128 {
+	x := new(Xof128)
 	x.Reset()
 	return x
 }
 
 // Clone returns a new copy of x.
-func (x *Xof) Clone() *Xof {
+func (x *Xof128) Clone() *Xof128 {
 	new := *x
 	return &new
 }
 
-func (x *Xof) Reset() {
-	x.digest.initHash(64, 12, 12, 0)
+func (x *Xof128) Reset() {
+	x.digest.initHash(3, 64, 12, 12, 0)
 	x.digest.len = 0
+	x.digest.initialized = true
 	x.digest.doneWriting = false
 }
 
-func (x *Xof) Write(p []byte) (int, error) {
-	if x.digest.b == 0 {
+func (x *Xof128) Write(p []byte) (int, error) {
+	if x.digest.initialized == false {
 		x.Reset()
 	}
 	x.digest.write(p)
 	return len(p), nil
 }
 
-func (x *Xof) Read(p []byte) (int, error) {
-	if x.digest.b == 0 {
+func (x *Xof128) Read(p []byte) (int, error) {
+	if x.digest.initialized == false {
 		x.Reset()
+	}
+	x.digest.read(p)
+	return len(p), nil
+}
+
+// Cxof128 is an implementation of the Ascon-CXOF128 customized arbitrary-length hash algorithm.
+// It implements the golang.org/x/crypto/sha3.ShakeHash interface (minus Clone).
+type Cxof128 struct {
+	digest       digest
+	initialState *state
+}
+
+func NewCxof128(customizationString string) (*Cxof128, error) {
+	// "The length of the customization string shall be at most 2048 bits (i.e., 256 bytes)."
+	if len(customizationString) > 256 {
+		return nil, errors.New("ascon: customization string too long")
+	}
+	x := new(Cxof128)
+	x.digest.initHash(4, 64, 12, 12, 0)
+	// absorb Z_0, the length of the customization string (in bits) encoded as a uint64
+	x.digest.s[0] ^= uint64(len(customizationString)) * 8
+	x.digest.permute()
+	// absorb the customization string
+	x.digest.write([]byte(customizationString))
+	x.digest.finish() // flush buffer and pad
+	// save the initial state
+	s := x.digest.s // make a copy
+	x.initialState = &s
+	x.digest.initialized = true
+	return x, nil
+}
+
+// Clone returns a new copy of x.
+func (x *Cxof128) Clone() *Cxof128 {
+	new := *x
+	return &new
+}
+
+func (x *Cxof128) Reset() {
+	if x.digest.initialized == false {
+		panic("ascon: reset of uninitialized CXOF")
+	}
+	x.digest.s = *x.initialState
+	x.digest.len = 0
+	x.digest.initialized = true
+	x.digest.doneWriting = false
+}
+
+func (x *Cxof128) Write(p []byte) (int, error) {
+	if x.digest.initialized == false {
+		panic("ascon: write to uninitialized CXOF")
+	}
+	x.digest.write(p)
+	return len(p), nil
+}
+
+func (x *Cxof128) Read(p []byte) (int, error) {
+	if x.digest.initialized == false {
+		panic("ascon: read from uninitialized CXOF")
 	}
 	x.digest.read(p)
 	return len(p), nil
@@ -96,50 +153,34 @@ func (x *Xof) Read(p []byte) (int, error) {
 // Writes which are a multiple of BlockSize will be more performant.
 func (d *digest) BlockSize() int { return BlockSize }
 
-func (d *digest) reset(b uint8) {
+func (d *digest) reset() {
 	//fmt.Println("resetting")
-	//d.initHash(BlockSize*8, 12, 12, Size*8)
-	switch b {
-	case 0:
-		b = 12
-		fallthrough
-	case 12:
-		d.s[0] = 0xee9398aadb67f03d
-		d.s[1] = 0x8bb21831c60f1002
-		d.s[2] = 0xb48a92db98d5da62
-		d.s[3] = 0x43189921b8f8e3e8
-		d.s[4] = 0x348fa5c9d525e140
-		d.b = b
-	case 8:
-		d.s[0] = 0x01470194fc6528a6
-		d.s[1] = 0x738ec38ac0adffa7
-		d.s[2] = 0x2ec8e3296c76384c
-		d.s[3] = 0xd6f6a54d7f52377d
-		d.s[4] = 0xa13c42a223be8d87
-		d.b = b
-	default:
-		d.initHash(BlockSize*8, 12, b, 256)
-	}
+	//d.initHash(2, BlockSize*8, 12, 12, 256)
+	d.s[0] = 0x9b1e5494e934d681
+	d.s[1] = 0x4bc3a01e333751d2
+	d.s[2] = 0xae65396c6b34b81a
+	d.s[3] = 0x3c7fd4a4d56a4db3
+	d.s[4] = 0x1a5c464906c5976d
 	d.buf = [8]byte{}
 	d.len = 0
+	d.initialized = true
 	d.doneWriting = false
 }
 
-// Ascon-Hash: l=256, hash=256, datablock=64, a=12, b=12
-// Ascon-Xof:  l=256, hash=0,   datablock=64, a=12, b=12
+// Ascon-Hash: v=2, l=256, hash=256, datablock=64, a=12, b=12
+// Ascon-Xof:  v=3, l=256, hash=0,   datablock=64, a=12, b=12
 
-func (d *digest) initHash(blockSize, a, b uint8, h uint32) {
-	d.s[0] = uint64(blockSize)<<48 + uint64(a)<<40 + uint64(a-b)<<32 + uint64(h)
+func (d *digest) initHash(v, blockSize, a, b uint8, h uint32) {
+	//d.s[0] = uint64(blockSize)<<48 + uint64(a)<<40 + uint64(a-b)<<32 + uint64(h)
+	d.s[0] = uint64(v) + uint64(a)<<16 + uint64(b)<<20 + uint64(h)<<24 + uint64(blockSize/8)<<40
 	d.s[1] = 0
 	d.s[2] = 0
 	d.s[3] = 0
 	d.s[4] = 0
-	d.b = b
-	d.roundA()
+	d.permute()
 }
 
-func (d *digest) roundA() { roundGeneric(&d.s, 12) }
-func (d *digest) roundB() { roundGeneric(&d.s, uint(d.b)) }
+func (d *digest) permute() { roundGeneric(&d.s, 12) }
 
 func (d *digest) write(b []byte) {
 	if d.doneWriting {
@@ -152,15 +193,15 @@ func (d *digest) write(b []byte) {
 		d.len += uint8(n)
 		b = b[n:]
 		if d.len == bs {
-			d.s[0] ^= be64dec(d.buf[0:])
-			d.roundB()
+			d.s[0] ^= le64dec(d.buf[0:])
+			d.permute()
 			d.len = 0
 		}
 	}
 	// absorb bytes directly, skipping the buffer
 	for len(b) >= bs {
-		d.s[0] ^= be64dec(b)
-		d.roundB()
+		d.s[0] ^= le64dec(b)
+		d.permute()
 		b = b[bs:]
 	}
 	// store any remaining bytes in the buffer
@@ -177,27 +218,32 @@ func (d *digest) finish() {
 
 	// Pad with a 1 followed by zeroes
 	const bs = BlockSize
-	for i := d.len; i < bs; i++ {
+	for i := d.len + 1; i < bs; i++ {
 		d.buf[i] = 0
 	}
-	d.buf[d.len] |= 0x80
+	d.buf[d.len] = 1
 
 	// absorb the last block
-	d.s[0] ^= be64dec(d.buf[0:])
-	d.roundA()
+	d.s[0] ^= le64dec(d.buf[0:])
+	d.permute()
 	d.len = 0
 }
 
-func (d0 *digest) sum(b []byte) []byte {
-	d := *d0
+func (d *digest) clone() *digest {
+	d0 := *d
+	return &d0
+}
+
+func (d *digest) sum(b []byte) []byte {
+	d = d.clone()
 	d.finish()
 
 	// Squeeze
 	for i := 0; i < HashSize/8; i++ {
 		if i != 0 {
-			d.roundB()
+			d.permute()
 		}
-		b = be64append(b, d.s[0])
+		b = le64append(b, d.s[0])
 	}
 	return b
 }
@@ -215,8 +261,8 @@ func (d *digest) read(p []byte) {
 	// Squeeze
 
 	// invariants:
-	//  if d.len == 8 then the buffer is empty and roundB has NOT been called since the previous block
-	//  if d.len == 0 then the buffer is empty and roundB HAS been called since the previous block, or this is the first block
+	//  if d.len == 8 then the buffer is empty and permute has NOT been called since the previous block
+	//  if d.len == 0 then the buffer is empty and permute HAS been called since the previous block, or this is the first block
 	//  if 0 < d.len < 8 then we have bytes to read in d.buf
 
 	// Copy out any leftover bytes from the previous block
@@ -236,12 +282,12 @@ func (d *digest) read(p []byte) {
 	// Copy whole blocks if we can
 	if len(p) >= 8 && d.len == 0 {
 		d.len = 8
-		be64enc(p, d.s[0])
+		le64enc(p, d.s[0])
 		p = p[8:]
 	}
 	for len(p) >= 8 {
-		d.roundB()
-		be64enc(p, d.s[0])
+		d.permute()
+		le64enc(p, d.s[0])
 		p = p[8:]
 	}
 
@@ -249,9 +295,9 @@ func (d *digest) read(p []byte) {
 	if len(p) > 0 {
 		// fill the buffer
 		if d.len == 8 {
-			d.roundB()
+			d.permute()
 		}
-		be64enc(d.buf[:], d.s[0])
+		le64enc(d.buf[:], d.s[0])
 		n := copy(p, d.buf[:])
 		d.len = uint8(n)
 	}
@@ -262,19 +308,19 @@ func (d *digest) read(p []byte) {
 // Used for testing Read.
 func (d *digest) readAll(p []byte) {
 	if d.doneWriting {
-		panic("internal error")
+		panic("ascon: internal error")
 	}
 	d.finish()
 	d.doneWriting = true
 
 	if len(p)%BlockSize != 0 {
-		panic("internal error")
+		panic("ascon: internal error")
 	}
 
 	for i := 0; i < len(p); i += BlockSize {
 		if i != 0 {
-			d.roundB()
+			d.permute()
 		}
-		be64enc(p[i:], d.s[0])
+		le64enc(p[i:], d.s[0])
 	}
 }

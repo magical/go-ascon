@@ -18,9 +18,9 @@ var genkat = flag.Bool("genkat", false, "generate KAT files")
 
 func TestInit(t *testing.T) {
 	// Test that the hardcoded initial state equals the computed values
-	h := NewHash()
-	g := new(Hash)
-	g.initHash(64, 12, 12, 256)
+	h := NewHash256()
+	g := new(Hash256)
+	g.initHash(2, 64, 12, 12, 256)
 	got := h.s
 	want := g.s
 	for i := range got {
@@ -29,28 +29,30 @@ func TestInit(t *testing.T) {
 		}
 	}
 
+	/**
 	h = NewHasha()
 	got = h.s
-	g.initHash(64, 12, 8, 256)
+	g.initHash(2, 64, 12, 8, 256)
 	want = g.s
 	for i := range got {
 		if got[i] != want[i] {
 			t.Errorf("Hasha: s[%d] = %016x, want %016x", i, got[i], want[i])
 		}
 	}
+	*/
 }
 
 var hashTests = []struct {
 	msgLen    int
 	hexDigest string
 }{
-	{0, "7346BC14F036E87AE03D0997913088F5F68411434B3CF8B54FA796A80D251F91"},
-	{1, "8DD446ADA58A7740ECF56EB638EF775F7D5C0FD5F0C2BBBDFDEC29609D3C43A2"},
-	{7, "DD409CCC0C60CD7F474C0BEED1E1CD48140AD45D5136DC5FDA5EBE283DF8D3F6"},
-	{8, "F4C6A44B29915D3D57CF928A18EC6226BB8DD6C1136ACD24965F7E7780CD69CF"},
-	{15, "9E48E03E8AAE0B9930DFF1E801007BC7105D6BD6CAAF16E3C31569D8942FC423"},
-	{16, "D4E56C4841E2A0069D4F07E61B2DCA94FD6D3F9C0DF78393E6E8292921BC841D"},
-	{100, "809CFCD3619777D73B162109EFCE633B272C8AFF18578D0169CB99F4783D136E"},
+	{0, "0B3BE5850F2F6B98CAF29F8FDEA89B64A1FA70AA249B8F839BD53BAA304D92B2"},
+	{1, "0728621035AF3ED2BCA03BF6FDE900F9456F5330E4B5EE23E7F6A1E70291BC80"},
+	{7, "3E4D273BA69B3B9C53216107E88B75CDBEEDBCBF8FAF0219C3928AB62B116577"},
+	{8, "B88E497AE8E6FB641B87EF622EB8F2FCA0ED95383F7FFEBE167ACF1099BA764F"},
+	{15, "6421330DF99C05EB715415EE17B455F2674F862AE3CC5BADFFE43A4A3ED273E1"},
+	{16, "3158C1940A2FBADBD68AB661777859B94A689E4EFC375911467ADDD641835C38"},
+	{100, "A4BC453C84F824F10092E8E9031799957E984A29BBAE5E84345E82F48DD71192"},
 }
 
 func TestHash(t *testing.T) {
@@ -60,7 +62,7 @@ func TestHash(t *testing.T) {
 			msg[i] = byte(i)
 		}
 		want := tt.hexDigest
-		h := NewHash()
+		h := NewHash256()
 		h.Write(msg)
 		got := fmt.Sprintf("%X", h.Sum(nil))
 		if got != want {
@@ -74,6 +76,7 @@ func TestHash(t *testing.T) {
 	}
 }
 
+/*
 var hashaTests = []struct {
 	msgLen    int
 	hexDigest string
@@ -107,9 +110,10 @@ func TestHasha(t *testing.T) {
 		}
 	}
 }
+*/
 
 func hashBytes(b []byte) []byte {
-	h := NewHash()
+	h := NewHash256()
 	h.Write(b)
 	return h.Sum(nil)
 }
@@ -119,7 +123,7 @@ func TestGenKatHash(t *testing.T) {
 	if !*genkat {
 		t.Skip("skipping without -genkat flag")
 	}
-	f, err := os.Create("ascon_hash_kat.txt")
+	f, err := os.Create("ascon_hash_256_kat.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,14 +146,14 @@ func TestGenKatXof(t *testing.T) {
 	if !*genkat {
 		t.Skip("skipping without -genkat flag")
 	}
-	f, err := os.Create("ascon_xof_kat.txt")
+	f, err := os.Create("ascon_xof_128_kat.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
 	defer w.Flush()
-	sum := make([]byte, 32)
+	sum := make([]byte, 64)
 	for i := 0; i <= 1024; i++ {
 		b := make([]byte, i)
 		for j := range b {
@@ -157,7 +161,7 @@ func TestGenKatXof(t *testing.T) {
 		}
 		fmt.Fprintf(w, "Count = %d\n", i+1)
 		fmt.Fprintf(w, "Msg = %X\n", b)
-		x := NewXof()
+		x := NewXof128()
 		x.Write(b)
 		x.Read(sum)
 		fmt.Fprintf(w, "MD = %X\n", sum)
@@ -166,7 +170,7 @@ func TestGenKatXof(t *testing.T) {
 }
 
 func TestXofChunks(t *testing.T) {
-	init := NewXof()
+	init := NewXof128()
 	init.Write([]byte("abc"))
 
 	const N = 2016
@@ -218,7 +222,58 @@ func unhex(s string) []byte {
 	return b
 }
 
-var _ cipher.AEAD = (*AEAD)(nil)
+func TestGenKatCxof(t *testing.T) {
+	if !*genkat {
+		t.Skip("skipping without -genkat flag")
+	}
+	f, err := os.Create("ascon_cxof_128_kat.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	w := bufio.NewWriter(f)
+	defer w.Flush()
+	sum := make([]byte, 64)
+	sum2 := make([]byte, 64)
+	mk := func(n int, base byte) []byte {
+		b := make([]byte, n)
+		for i := range b {
+			b[i] = base + byte(i%256)
+		}
+		return b
+	}
+	num := 0
+	for i := 0; i <= 32; i++ {
+		for j := 0; j <= 32; j++ {
+			num++
+			msg := mk(i, 0x00)
+			custom := mk(j, 0x10)
+			fmt.Fprintf(w, "Count = %d\n", num)
+			fmt.Fprintf(w, "Msg = %X\n", msg)
+			fmt.Fprintf(w, "Z = %X\n", custom)
+			x, err := NewCxof128(string(custom))
+			if err != nil {
+				fmt.Fprintf(w, "Error = %q", err)
+				t.Errorf("got error (Count = %d): %v", num, err)
+				continue
+			}
+			x.Write(msg)
+			x.Read(sum)
+			fmt.Fprintf(w, "MD = %X\n", sum)
+			fmt.Fprintln(w)
+
+			// Test reset
+			x.Reset()
+			x.Write(msg)
+			x.Read(sum2)
+			if !bytes.Equal(sum, sum2) {
+				t.Errorf("got different hash after reset (Count = %d):\n\t%X\n\t%X", num, sum, sum2)
+			}
+		}
+	}
+}
+
+var _ cipher.AEAD = (*AEAD128)(nil)
 
 func TestAEAD(t *testing.T) {
 	//Count = 514
@@ -236,11 +291,11 @@ func TestAEAD(t *testing.T) {
 		nonce = key
 		text  = unhex("000102030405060708090A0B0C0D0E")
 		ad    = unhex("000102030405060708090A0B0C0D0E0F1011")
-		want  = "77AA511159627C4B855E67F95B3ABFA1FA8B51439743E4C8B41E4E76B40460"
+		want  = "501DFE330EC4528E8D3BC467A02391946E05C9402166B0CFB2E25844EA1277"
 		//ad   = unhex("")
 		//want = "BC820DBDF7A4631C5B29884AD6917516D420A5BC2E5357D010818F0B5F7859"
 	)
-	a, _ := NewAEAD(key)
+	a, _ := NewAEAD128(key)
 	c := a.Seal(nil, nonce, text, ad)
 	got := fmt.Sprintf("%X", c)
 	if got != want {
@@ -248,43 +303,43 @@ func TestAEAD(t *testing.T) {
 	}
 }
 
-func TestGenKatAEAD(t *testing.T) {
+func TestGenKatAEAD128(t *testing.T) {
 	if !*genkat {
 		t.Skip("skipping without -genkat flag")
 	}
-	f, err := os.Create("ascon_aead_kat.txt")
+	f, err := os.Create("ascon_aead_128_kat.txt")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer f.Close()
 	w := bufio.NewWriter(f)
 	defer w.Flush()
-	num := 1
+	num := 0
 
-	mk := func(n int) []byte {
+	mk := func(n int, base byte) []byte {
 		b := make([]byte, n)
 		for i := range b {
-			b[i] = byte(i % 256)
+			b[i] = base + byte(i%256)
 		}
 		return b
 	}
 	for i := 0; i <= 32; i++ {
 		for j := 0; j <= 32; j++ {
-			key := mk(16)
-			nonce := mk(16)
-			msg := mk(i)
-			ad := mk(j)
+			num += 1
+			key := mk(16, 0x00)
+			nonce := mk(16, 0x10)
+			msg := mk(i, 0x20)
+			ad := mk(j, 0x30)
 
 			fmt.Fprintf(w, "Count = %d\n", num)
 			fmt.Fprintf(w, "Key = %X\n", key)
 			fmt.Fprintf(w, "Nonce = %X\n", nonce)
 			fmt.Fprintf(w, "PT = %X\n", msg)
 			fmt.Fprintf(w, "AD = %X\n", ad)
-			a, _ := NewAEAD(key)
+			a, _ := NewAEAD128(key)
 			c := a.Seal(nil, nonce, msg, ad)
 			fmt.Fprintf(w, "CT = %X\n", c)
 			fmt.Fprintln(w)
-			num += 1
 
 			// TODO: do these tests even without -genkat
 			if d, err := a.Open(nil, nonce, c, ad); err != nil {
@@ -303,7 +358,7 @@ func TestGenKatAEAD(t *testing.T) {
 
 // TODO: test overlap
 
-func benchHash(b *testing.B, f func() *Hash, size int64) {
+func benchHash(b *testing.B, f func() *Hash256, size int64) {
 	b.SetBytes(size)
 	var tmp = make([]byte, 0, HashSize)
 	var msg = make([]byte, size)
@@ -317,18 +372,20 @@ func benchHash(b *testing.B, f func() *Hash, size int64) {
 }
 
 func BenchmarkHash(b *testing.B) {
-	b.Run("8", func(b *testing.B) { benchHash(b, NewHash, 8) })
-	b.Run("64", func(b *testing.B) { benchHash(b, NewHash, 64) })
-	b.Run("1k", func(b *testing.B) { benchHash(b, NewHash, 1024) })
-	b.Run("8k", func(b *testing.B) { benchHash(b, NewHash, 8192) })
+	b.Run("8", func(b *testing.B) { benchHash(b, NewHash256, 8) })
+	b.Run("64", func(b *testing.B) { benchHash(b, NewHash256, 64) })
+	b.Run("1k", func(b *testing.B) { benchHash(b, NewHash256, 1024) })
+	b.Run("8k", func(b *testing.B) { benchHash(b, NewHash256, 8192) })
 }
 
+/*
 func BenchmarkHasha(b *testing.B) {
 	b.Run("8", func(b *testing.B) { benchHash(b, NewHasha, 8) })
 	b.Run("64", func(b *testing.B) { benchHash(b, NewHasha, 64) })
 	b.Run("1k", func(b *testing.B) { benchHash(b, NewHasha, 1024) })
 	b.Run("8k", func(b *testing.B) { benchHash(b, NewHasha, 8192) })
 }
+*/
 
 func benchSeal(b *testing.B, size int64) {
 	b.SetBytes(size)
@@ -336,7 +393,7 @@ func benchSeal(b *testing.B, size int64) {
 	var dst = make([]byte, 0, size+TagSize)
 	var msg = make([]byte, size)
 	var key = make([]byte, KeySize)
-	a, err := NewAEAD(key)
+	a, err := NewAEAD128(key)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -358,7 +415,7 @@ func benchOpen(b *testing.B, size int64) {
 	var nonce = make([]byte, NonceSize)
 	var msg = make([]byte, size)
 	var key = make([]byte, KeySize)
-	a, err := NewAEAD(key)
+	a, err := NewAEAD128(key)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -382,7 +439,7 @@ func BenchmarkOpen(b *testing.B) {
 func benchRead(b *testing.B, size int64) {
 	b.SetBytes(size)
 	var buf = make([]byte, size)
-	x := NewXof()
+	x := NewXof128()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		x.Read(buf)

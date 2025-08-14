@@ -1,6 +1,8 @@
 // Copyright © 2023 by Andrew Ekstedt <andrew.ekstedt@gmail.com>
 // All rights reserved. See LICENSE for details.
 
+// +build ignore
+
 package ascon
 
 import "crypto/subtle"
