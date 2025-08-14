@@ -18,6 +18,9 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
 
+      - name: Fetch test vectors
+        run: bash -v getjson.sh
+
       - name: Build
         run: go build -v ./...
 

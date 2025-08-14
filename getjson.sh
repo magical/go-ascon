@@ -1,5 +1,5 @@
 
-baseurl='https://github.com/usnistgov/ACVP-Server/raw/refs/heads/master/gen-val/json-files'
+baseurl='https://github.com/usnistgov/ACVP-Server/raw/refs/tags/v1.1.0.40/gen-val/json-files'
 
 set -euo pipefail
 
