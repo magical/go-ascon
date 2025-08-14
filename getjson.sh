@@ -3,6 +3,11 @@ baseurl='https://github.com/usnistgov/ACVP-Server/raw/refs/heads/master/gen-val/
 
 set -euo pipefail
 
+if ! command -v jq >/dev/null || ! command -v curl >/dev/null; then
+    echo >&2 "error: $0 requires the 'jq' and 'curl' commands to be installed"
+    exit 1
+fi
+
 
 # Hash
 mkdir -p json/hash
